@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
-  PlusCircle, 
+  Plus,
   Trash2, 
   ClipboardList, 
   Moon,
@@ -8,31 +8,27 @@ import {
   Edit3,
   Clock,
   Stethoscope,
-  Activity,
   ChevronLeft,
   ChevronRight,
-  Calculator,
   TrendingUp,
-  AlertCircle,
-  FileText,
   MapPin,
   Calendar as CalendarIcon,
-  Heart,
-  Instagram,
-  Linkedin,
-  Mail,
-  Download,
-  Eye,
-  EyeOff
+  PieChart,
+  FileSpreadsheet,
+  PlusCircle,
+  X,
+  Search,
+  Filter,
+  ArrowRight,
+  Receipt
 } from 'lucide-react';
 
-/**
- * COMPONENTE NAVBAR
- * Diseño premium con desenfoque de fondo y soporte para modo oscuro.
- */
-const Navbar = ({ view, setView, darkMode, setDarkMode, currentTime }) => (
+const XLSX_SCRIPT_URL = "https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js";
+const TAX_RATE = 0.1525; // 15.25% solicitado
+
+const Navbar = ({ view, setView, darkMode, setDarkMode }) => (
   <nav className={`navbar sticky-top border-bottom px-2 py-2 px-md-3 py-md-3 ${darkMode ? 'navbar-dark bg-dark border-secondary' : 'navbar-light bg-white border-light'}`} 
-       style={{ backdropFilter: 'blur(20px)', backgroundColor: darkMode ? 'rgba(15, 15, 20, 0.9)' : 'rgba(255, 255, 255, 0.9)', zIndex: 1050 }}>
+       style={{ backdropFilter: 'blur(20px)', backgroundColor: darkMode ? '#0f0f14' : '#ffffff', zIndex: 1050 }}>
     <div className="container-fluid flex-nowrap">
       <div className="d-flex align-items-center gap-2 gap-md-3" onClick={() => setView('home')} style={{ cursor: 'pointer' }}>
         <div className="bg-primary bg-gradient p-2 rounded-4 shadow-sm">
@@ -40,31 +36,28 @@ const Navbar = ({ view, setView, darkMode, setDarkMode, currentTime }) => (
         </div>
         <div className="d-flex flex-column d-none d-sm-flex">
           <span className="fw-bold h6 mb-0 text-primary" style={{ letterSpacing: '-0.5px' }}>SurgiTrack <span className="text-info">Pro</span></span>
-          <small className={`fw-bold text-uppercase opacity-75 ${darkMode ? 'text-white' : 'text-dark'}`} style={{ fontSize: '8px', letterSpacing: '1px' }}>Dra. Maria Joaquina</small>
+          <small className={`fw-bold text-uppercase ${darkMode ? 'text-light' : 'text-dark'}`} style={{ fontSize: '8px', opacity: 0.8 }}>Dra. Maria Joaquina</small>
         </div>
       </div>
 
-      <div className={`d-none d-lg-flex align-items-center gap-3 px-3 py-2 rounded-pill border shadow-sm ${darkMode ? 'bg-white bg-opacity-10 text-white border-secondary' : 'bg-light text-primary border-primary border-opacity-10'}`}>
-        <Clock size={16} />
-        <span className="font-monospace fw-bold small">
-          {currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-        </span>
-      </div>
-
       <div className="d-flex align-items-center gap-1 gap-md-2">
-        <div className="d-flex bg-secondary bg-opacity-10 p-1 rounded-4 border me-1 me-md-2">
-          <button onClick={() => setView('dashboard')} className={`btn btn-sm px-2 px-md-3 rounded-pill fw-bold transition-all ${view === 'dashboard' ? 'btn-primary shadow-sm' : 'border-0 text-secondary'}`}>
+        <button onClick={() => setView('form')} className="btn btn-primary btn-sm rounded-pill px-3 fw-bold d-flex align-items-center gap-1 me-2 shadow-sm">
+          <PlusCircle size={18} /> <span className="d-none d-md-inline">Nueva Cx</span>
+        </button>
+        
+        <div className={`d-flex p-1 rounded-4 border ${darkMode ? 'bg-secondary bg-opacity-25 border-secondary' : 'bg-light border-light'}`}>
+          <button onClick={() => setView('dashboard')} className={`btn btn-sm px-2 px-md-3 rounded-pill fw-bold ${view === 'dashboard' ? 'btn-primary shadow-sm text-white' : 'border-0 text-secondary'}`}>
             <TrendingUp size={16} className="d-md-none"/> <span className="d-none d-md-inline">Análisis</span>
           </button>
-          <button onClick={() => setView('calendar')} className={`btn btn-sm px-2 px-md-3 rounded-pill fw-bold transition-all ${view === 'calendar' ? 'btn-primary shadow-sm' : 'border-0 text-secondary'}`}>
+          <button onClick={() => setView('calendar')} className={`btn btn-sm px-2 px-md-3 rounded-pill fw-bold ${view === 'calendar' ? 'btn-primary shadow-sm text-white' : 'border-0 text-secondary'}`}>
             <CalendarIcon size={16} className="d-md-none"/> <span className="d-none d-md-inline">Agenda</span>
           </button>
-          <button onClick={() => setView('history')} className={`btn btn-sm px-2 px-md-3 rounded-pill fw-bold transition-all ${view === 'history' ? 'btn-primary shadow-sm' : 'border-0 text-secondary'}`}>
+          <button onClick={() => setView('history')} className={`btn btn-sm px-2 px-md-3 rounded-pill fw-bold ${view === 'history' ? 'btn-primary shadow-sm text-white' : 'border-0 text-secondary'}`}>
             <ClipboardList size={16} className="d-md-none"/> <span className="d-none d-md-inline">Registros</span>
           </button>
         </div>
         
-        <button onClick={() => setDarkMode(!darkMode)} className={`btn border-0 p-2 rounded-circle hover-scale ${darkMode ? 'text-warning' : 'text-secondary'}`}>
+        <button onClick={() => setDarkMode(!darkMode)} className={`btn border-0 p-2 rounded-circle ${darkMode ? 'text-warning' : 'text-secondary'}`}>
           {darkMode ? <Sun size={20} /> : <Moon size={20} />}
         </button>
       </div>
@@ -72,39 +65,39 @@ const Navbar = ({ view, setView, darkMode, setDarkMode, currentTime }) => (
   </nav>
 );
 
-const Footer = ({ darkMode }) => (
-  <footer className={`py-5 mt-auto border-top ${darkMode ? 'bg-dark text-white border-secondary' : 'bg-white text-dark border-light'}`}>
-    <div className="container text-center">
-      <div className="d-flex justify-content-center align-items-center gap-2 mb-3">
-         <Stethoscope className="text-primary" />
-         <span className="fw-bold h5 mb-0">SurgiTrack Pro</span>
-      </div>
-      <p className="small opacity-50 mb-0">Desarrollado con <Heart size={12} className="text-danger fill-danger" /> para la Dra. Maria Joaquina.</p>
-    </div>
-  </footer>
-);
-
 export default function App() {
   const [darkMode, setDarkMode] = useState(true);
   const [view, setView] = useState('home'); 
   const [editingId, setEditingId] = useState(null);
-  const [showFinances, setShowFinances] = useState(true);
-  const [currentTime, setCurrentTime] = useState(new Date());
+  
   const [currentCalDate, setCurrentCalDate] = useState(new Date());
+  const [selectedAnalysisDate, setSelectedAnalysisDate] = useState(new Date());
+  const [selectedDayRecords, setSelectedDayRecords] = useState(null);
+  
+  const [searchTerm, setSearchTerm] = useState('');
+  const [dateRange, setDateRange] = useState({ start: '', end: '' });
 
   const [records, setRecords] = useState(() => {
-    const saved = localStorage.getItem('mj_surgical_v5_final');
+    const saved = localStorage.getItem('mj_surgical_v9_1');
     return saved ? JSON.parse(saved) : [];
   });
 
   useEffect(() => {
-    localStorage.setItem('mj_surgical_v5_final', JSON.stringify(records));
+    localStorage.setItem('mj_surgical_v9_1', JSON.stringify(records));
   }, [records]);
 
   useEffect(() => {
-    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
-    return () => clearInterval(timer);
+    const script = document.createElement("script");
+    script.src = XLSX_SCRIPT_URL;
+    document.head.appendChild(script);
   }, []);
+
+  const calculateFinance = (bruto) => {
+    const val = parseFloat(bruto) || 0;
+    const retencion = val * TAX_RATE;
+    const liquido = val - retencion;
+    return { bruto: val, retencion, liquido };
+  };
 
   const initialForm = {
     fecha: new Date().toISOString().split('T')[0],
@@ -112,35 +105,63 @@ export default function App() {
     institucion: '',
     paciente: '',
     tipoCx: '',
-    estadoCx: 'Programada',
     valorBruto: ''
   };
 
   const [formData, setFormData] = useState(initialForm);
 
-  const calculateFinance = (bruto) => {
-    const val = parseFloat(bruto) || 0;
-    const retencion = val * 0.15;
-    const liquido = val - retencion;
-    return { bruto: val, retencion, liquido };
+  const openFormWithDate = (dateStr) => {
+    setEditingId(null);
+    setFormData({
+      ...initialForm,
+      fecha: dateStr,
+      hora: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })
+    });
+    setView('form');
   };
 
-  const downloadCSV = () => {
-    const headers = ["Fecha", "Hora", "Paciente", "Procedimiento", "Institucion", "Estado", "Bruto", "Retencion(15%)", "Liquido"];
-    const rows = records.map(r => {
+  const exportToExcel = (dataToExport, filename) => {
+    if (!window.XLSX) return;
+    const worksheetData = dataToExport.map(r => {
       const f = calculateFinance(r.valorBruto);
-      return [r.fecha, r.hora, r.paciente, r.tipoCx, r.institucion, r.estadoCx, f.bruto, f.retencion, f.liquido].join(",");
+      return {
+        "ID Registro": r.id, "Fecha": r.fecha, "Hora": r.hora, "Paciente": r.paciente,
+        "Procedimiento": r.tipoCx, "Institución": r.institucion, "Monto Bruto ($)": f.bruto,
+        "Retención 15.25% ($)": f.retencion, "Monto Neto ($)": f.liquido
+      };
     });
-    
-    const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows].join("\n");
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `Reporte_MJ_${new Date().toISOString().split('T')[0]}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    const worksheet = window.XLSX.utils.json_to_sheet(worksheetData);
+    const workbook = window.XLSX.utils.book_new();
+    window.XLSX.utils.book_append_sheet(workbook, worksheet, "Cirugías");
+    window.XLSX.writeFile(workbook, `${filename}.xlsx`);
   };
+
+  const statsPeriodo = useMemo(() => {
+    const month = selectedAnalysisDate.getMonth();
+    const year = selectedAnalysisDate.getFullYear();
+    const filtered = records.filter(r => {
+      const d = new Date(r.fecha + "T00:00:00");
+      return d.getMonth() === month && d.getFullYear() === year;
+    });
+    const bruto = filtered.reduce((acc, curr) => acc + (parseFloat(curr.valorBruto) || 0), 0);
+    return { bruto, retencion: bruto * TAX_RATE, liquido: bruto * (1 - TAX_RATE), count: filtered.length, filteredRecords: filtered };
+  }, [records, selectedAnalysisDate]);
+
+  const filteredHistory = useMemo(() => {
+    return records.filter(r => {
+      const matchesSearch = 
+        r.paciente.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        r.tipoCx.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        r.institucion.toLowerCase().includes(searchTerm.toLowerCase());
+      
+      const dateVal = new Date(r.fecha + "T00:00:00");
+      const startLimit = dateRange.start ? new Date(dateRange.start + "T00:00:00") : null;
+      const endLimit = dateRange.end ? new Date(dateRange.end + "T23:59:59") : null;
+      const matchesDate = (!startLimit || dateVal >= startLimit) && (!endLimit || dateVal <= endLimit);
+      
+      return matchesSearch && matchesDate;
+    });
+  }, [records, searchTerm, dateRange]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -148,16 +169,10 @@ export default function App() {
       setRecords(prev => prev.map(r => r.id === editingId ? { ...formData, id: r.id } : r));
       setEditingId(null);
     } else {
-      setRecords([{ ...formData, id: Date.now() }, ...records]);
+      setRecords([{ ...formData, id: `CX-${Date.now()}` }, ...records]);
     }
     setFormData(initialForm);
     setView('history');
-  };
-
-  const startEdit = (record) => {
-    setFormData(record);
-    setEditingId(record.id);
-    setView('form');
   };
 
   const calendarDays = useMemo(() => {
@@ -166,7 +181,6 @@ export default function App() {
     const days = [];
     const firstDay = new Date(year, month, 1).getDay();
     const daysInMonth = new Date(year, month + 1, 0).getDate();
-
     for (let i = 0; i < firstDay; i++) days.push({ day: null });
     for (let i = 1; i <= daysInMonth; i++) {
       const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
@@ -175,248 +189,340 @@ export default function App() {
     return days;
   }, [currentCalDate, records]);
 
+  // Resumen financiero del día seleccionado
+  const selectedDayFinance = useMemo(() => {
+    if (!selectedDayRecords) return null;
+    const bruto = selectedDayRecords.records.reduce((acc, curr) => acc + (parseFloat(curr.valorBruto) || 0), 0);
+    const retencion = bruto * TAX_RATE;
+    const liquido = bruto - retencion;
+    return { bruto, retencion, liquido };
+  }, [selectedDayRecords]);
+
   return (
-    <div className={`min-vh-100 d-flex flex-column m-0 p-0 ${darkMode ? 'bg-dark text-light' : 'bg-light text-dark'}`} 
-         style={{ transition: 'background 0.3s ease', overflowX: 'hidden', width: '100vw' }}>
-      
+    <div className={`min-vh-100 d-flex flex-column ${darkMode ? 'bg-dark text-white' : 'bg-light text-dark'}`} style={{ width: '100vw', overflowX: 'hidden' }}>
       <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" />
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap');
-        body { overflow-x: hidden; width: 100vw; margin: 0; padding: 0; background: ${darkMode ? '#121212' : '#f8f9fa'}; }
-        .fw-black { font-weight: 800 !important; }
-        .card { border-radius: 24px; border: none; }
-        .glass-panel { background: ${darkMode ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)'}; backdrop-filter: blur(10px); border: 1px solid ${darkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)'}; }
+        body { font-family: 'Inter', sans-serif; background: ${darkMode ? '#0a0a0c' : '#f9fafb'}; }
+        .text-contrast-fix { color: ${darkMode ? '#FFFFFF !important' : '#111827 !important'}; }
+        .text-muted-fix { color: ${darkMode ? '#A1A1AA !important' : '#4B5563 !important'}; }
         
-        /* Correcion de inputs en Modo Oscuro */
-        .form-control, .form-select { 
-          color: ${darkMode ? '#ffffff' : '#212529'} !important;
-          background-color: ${darkMode ? 'rgba(255,255,255,0.05)' : '#ffffff'} !important;
-          border-color: ${darkMode ? 'rgba(255,255,255,0.1)' : '#dee2e6'} !important;
+        .form-control, .form-select {
+          background-color: ${darkMode ? '#1a1a20' : '#ffffff'} !important;
+          color: ${darkMode ? '#ffffff' : '#000000'} !important;
+          border: 1px solid ${darkMode ? '#3f3f46' : '#d1d5db'} !important;
+          padding: 12px 16px;
+          border-radius: 12px;
         }
-        .form-control::placeholder { color: ${darkMode ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.4)'} !important; }
-        .form-label { color: ${darkMode ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.6)'} !important; }
 
-        .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 12px; min-width: 800px; }
-        .calendar-container { overflow-x: auto; padding-bottom: 20px; }
-        .calendar-cell { min-height: 140px; border-radius: 20px; transition: transform 0.2s; position: relative; }
-        .calendar-cell:hover { transform: scale(1.02); }
+        .glass-card { 
+          background: ${darkMode ? 'rgba(30, 30, 35, 0.95)' : 'rgba(255, 255, 255, 0.95)'}; 
+          backdrop-filter: blur(10px); 
+          border: 1px solid ${darkMode ? '#333' : '#eee'};
+          border-radius: 24px;
+        }
 
-        .text-time-contrast { color: ${darkMode ? '#00d2ff' : '#0d6efd'} !important; }
-        .btn-primary { background: linear-gradient(135deg, #0d6efd 0%, #00d2ff 100%); border: none; }
-      `}</style>
-      
-      <Navbar view={view} setView={setView} darkMode={darkMode} setDarkMode={setDarkMode} currentTime={currentTime} />
-
-      <main className="container-fluid px-3 px-md-5 flex-grow-1 py-4">
+        .calendar-cell { min-height: 100px; border-radius: 12px; transition: 0.2s; position: relative; border: 1px solid ${darkMode ? '#222' : '#eee'}; }
+        .calendar-cell:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        .calendar-cell:hover .day-add-btn { opacity: 1; }
         
-        {/* HOME */}
-        {view === 'home' && (
-          <div className="row align-items-center py-5">
-            <div className="col-lg-6 mb-5 mb-lg-0 text-center text-lg-start">
-              <span className="badge rounded-pill bg-primary bg-opacity-10 text-primary px-3 py-2 mb-4 fw-bold">DRA. MARIA JOAQUINA</span>
-              <h1 className="display-2 fw-black mb-4 ls-n1">Gestión de <span className="text-primary">Vanguardia</span> Quirúrgica.</h1>
-              <p className="lead opacity-75 mb-5 pe-lg-5">Control total de tus procedimientos, finanzas y agenda en una plataforma diseñada para la excelencia médica.</p>
-              <div className="d-flex flex-column flex-sm-row gap-3 justify-content-center justify-content-lg-start">
-                <button className="btn btn-primary btn-lg px-5 py-3 rounded-pill fw-bold shadow-lg" onClick={() => setView('calendar')}>Explorar Agenda</button>
-                <button className="btn btn-outline-primary btn-lg px-5 py-3 rounded-pill fw-bold" onClick={() => { setFormData(initialForm); setView('form'); }}>Nueva Intervención</button>
+        .day-add-btn {
+          position: absolute; top: 4px; right: 4px; width: 22px; height: 22px; border-radius: 50%;
+          display: flex; align-items: center; justify-content: center; opacity: 0; transition: 0.2s; border: none;
+          background-color: ${darkMode ? '#334155' : '#e2e8f0'};
+          color: ${darkMode ? '#fff' : '#0d6efd'};
+        }
+        .day-add-btn:hover { opacity: 1 !important; transform: scale(1.1); background: #0d6efd !important; color: white !important; }
+
+        .btn-plus-float {
+          position: fixed; bottom: 30px; right: 30px; width: 60px; height: 60px; border-radius: 50%;
+          z-index: 1000; display: flex; align-items: center; justify-content: center;
+          box-shadow: 0 10px 25px rgba(13, 110, 253, 0.4); transition: 0.3s;
+        }
+        
+        /* Arreglo contraste botones navegación */
+        .btn-nav-cal {
+           background-color: ${darkMode ? '#2a2a35' : '#f8f9fa'};
+           color: ${darkMode ? '#ffffff' : '#333333'};
+           border: 1px solid ${darkMode ? '#3f3f46' : '#dee2e6'};
+        }
+        .btn-nav-cal:hover {
+           background-color: ${darkMode ? '#3f3f46' : '#e9ecef'};
+        }
+
+        .animate-fade { animation: fadeIn 0.3s ease forwards; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+      `}</style>
+
+      <Navbar view={view} setView={setView} darkMode={darkMode} setDarkMode={setDarkMode} />
+
+      <button onClick={() => { setEditingId(null); setFormData(initialForm); setView('form'); }} className="btn btn-primary btn-plus-float">
+        <Plus size={32} />
+      </button>
+
+      <main className="container-fluid px-3 px-md-5 py-4 flex-grow-1">
+        
+        {/* FORMULARIO */}
+        {view === 'form' && (
+          <div className="d-flex justify-content-center animate-fade py-2">
+            <div className={`card glass-card p-4 p-md-5 w-100 shadow-lg`} style={{ maxWidth: '700px' }}>
+              <div className="d-flex justify-content-between align-items-start mb-4">
+                <div className="text-start">
+                  <h2 className="fw-bold text-contrast-fix m-0">{editingId ? 'Editar Cirugía' : 'Nuevo Registro'}</h2>
+                  <p className="text-muted-fix small">Retención Automática del {(TAX_RATE*100).toFixed(2)}%</p>
+                </div>
+                <button onClick={() => setView('calendar')} className={`btn rounded-circle p-2 border-0 ${darkMode ? 'text-light' : 'text-dark'}`}><X size={24} /></button>
               </div>
-            </div>
-            <div className="col-lg-6">
-              <img src="https://images.unsplash.com/photo-1579684385127-1ef15d508118?auto=format&fit=crop&w=800&q=80" className="img-fluid rounded-5 shadow-2xl" alt="Cirugía" />
+
+              <form onSubmit={handleSubmit} className="row g-3">
+                <div className="col-md-6"><label className="form-label fw-bold text-contrast-fix small">FECHA</label>
+                  <input type="date" className="form-control" value={formData.fecha} onChange={e => setFormData({...formData, fecha: e.target.value})} required /></div>
+                <div className="col-md-6"><label className="form-label fw-bold text-contrast-fix small">HORA</label>
+                  <input type="time" className="form-control" value={formData.hora} onChange={e => setFormData({...formData, hora: e.target.value})} required /></div>
+                <div className="col-12"><label className="form-label fw-bold text-contrast-fix small">PACIENTE</label>
+                  <input type="text" className="form-control" placeholder="Nombre completo" value={formData.paciente} onChange={e => setFormData({...formData, paciente: e.target.value})} required /></div>
+                <div className="col-12"><label className="form-label fw-bold text-contrast-fix small">CIRUGÍA / PROCEDIMIENTO</label>
+                  <input type="text" className="form-control" placeholder="Tipo de cirugía" value={formData.tipoCx} onChange={e => setFormData({...formData, tipoCx: e.target.value})} required /></div>
+                <div className="col-12"><label className="form-label fw-bold text-contrast-fix small">INSTITUCIÓN</label>
+                  <input type="text" className="form-control" placeholder="Clínica o Hospital" value={formData.institucion} onChange={e => setFormData({...formData, institucion: e.target.value})} required /></div>
+                <div className="col-12"><label className="form-label fw-bold text-contrast-fix small">HONORARIOS BRUTOS ($)</label>
+                  <input type="number" className="form-control fw-bold text-primary h4 py-3" value={formData.valorBruto} onChange={e => setFormData({...formData, valorBruto: e.target.value})} required /></div>
+                <div className="col-12 mt-4"><button type="submit" className="btn btn-primary w-100 p-3 rounded-pill fw-bold shadow-sm">{editingId ? 'Guardar Cambios' : 'Confirmar Registro'}</button></div>
+              </form>
             </div>
           </div>
         )}
 
         {/* CALENDARIO */}
         {view === 'calendar' && (
-          <div className="animate__animated animate__fadeIn">
-            <div className="d-flex flex-column flex-md-row justify-content-between align-items-center mb-5 gap-3">
-              <h2 className="fw-black m-0 h1">Calendario Quirúrgico</h2>
-              <div className="d-flex align-items-center glass-panel p-2 rounded-pill shadow-sm">
-                <button onClick={() => setCurrentCalDate(new Date(currentCalDate.getFullYear(), currentCalDate.getMonth() - 1, 1))} className="btn btn-light rounded-circle p-2"><ChevronLeft size={20}/></button>
-                <span className="px-4 fw-bold text-uppercase text-primary" style={{ minWidth: '180px', textAlign: 'center' }}>
+          <div className="animate-fade">
+            <div className="d-flex flex-column flex-md-row justify-content-between align-items-center mb-4 gap-3">
+              <h2 className="fw-bold m-0 text-contrast-fix">Agenda Quirúrgica</h2>
+              <div className={`d-flex align-items-center rounded-pill p-1 ${darkMode ? 'bg-secondary bg-opacity-25' : 'bg-light'}`}>
+                <button onClick={() => setCurrentCalDate(new Date(currentCalDate.getFullYear(), currentCalDate.getMonth() - 1, 1))} className="btn btn-sm btn-nav-cal rounded-circle"><ChevronLeft size={16}/></button>
+                <span className="px-3 fw-bold text-uppercase small text-contrast-fix" style={{ minWidth: '160px', textAlign: 'center' }}>
                   {currentCalDate.toLocaleString('es-ES', { month: 'long', year: 'numeric' })}
                 </span>
-                <button onClick={() => setCurrentCalDate(new Date(currentCalDate.getFullYear(), currentCalDate.getMonth() + 1, 1))} className="btn btn-light rounded-circle p-2"><ChevronRight size={20}/></button>
+                <button onClick={() => setCurrentCalDate(new Date(currentCalDate.getFullYear(), currentCalDate.getMonth() + 1, 1))} className="btn btn-sm btn-nav-cal rounded-circle"><ChevronRight size={16}/></button>
               </div>
-            </div>
-
-            <div className="calendar-container">
-              <div className="calendar-grid text-center mb-3">
-                {['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'].map(d => (
-                  <div key={d} className="fw-bold text-secondary small text-uppercase ls-2">{d}</div>
-                ))}
-              </div>
-
-              <div className="calendar-grid">
-                {calendarDays.map((d, i) => (
-                  <div key={i}>
-                    {d.day ? (
-                      <div 
-                        onClick={() => setView('history')}
-                        className={`calendar-cell p-3 border ${d.records.length > 0 ? 'border-primary bg-primary bg-opacity-10' : (darkMode ? 'bg-white bg-opacity-5 border-secondary border-opacity-20' : 'bg-white border-light shadow-sm')}`}
-                        style={{ cursor: 'pointer' }}
-                      >
-                        <div className="d-flex justify-content-between">
-                          <span className={`fw-black h4 ${d.records.length > 0 ? 'text-primary' : 'opacity-25'}`}>{d.day}</span>
-                          {d.records.length > 0 && <span className="badge rounded-pill bg-primary">{d.records.length}</span>}
-                        </div>
-                        <div className="mt-2">
-                          {d.records.slice(0, 2).map((r, idx) => (
-                            <div key={idx} className="bg-primary text-white p-1 mb-1 rounded text-truncate fw-bold" style={{ fontSize: '10px' }}>
-                              {r.paciente}
-                            </div>
-                          ))}
-                        </div>
-                        <button 
-                          onClick={(e) => { e.stopPropagation(); setFormData({...initialForm, fecha: d.date}); setView('form'); }}
-                          className="btn btn-primary btn-sm rounded-circle position-absolute bottom-0 end-0 m-2 shadow"
-                          style={{ width: '30px', height: '30px' }}
-                        ><PlusCircle size={14}/></button>
-                      </div>
-                    ) : <div className="calendar-cell opacity-0"></div>}
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* REGISTROS */}
-        {view === 'history' && (
-          <div className="animate__animated animate__fadeIn">
-            <div className="d-flex flex-column flex-md-row justify-content-between align-items-center mb-4 gap-3">
-               <h2 className="fw-black h1 m-0">Historial Médico</h2>
-               <div className="d-flex gap-2">
-                  <button className="btn btn-outline-success rounded-pill px-4 fw-bold d-flex align-items-center gap-2" onClick={downloadCSV}>
-                    <Download size={18}/> Exportar Excel
-                  </button>
-                  <button className="btn btn-primary rounded-pill px-4 fw-bold" onClick={() => { setFormData(initialForm); setView('form'); }}>
-                    Nueva Cirugía
-                  </button>
-               </div>
             </div>
 
             <div className="row g-4">
-               {records.map(r => {
-                 const f = calculateFinance(r.valorBruto);
-                 return (
-                   <div className="col-12 col-lg-4" key={r.id}>
-                     <div className={`card h-100 ${darkMode ? 'bg-secondary bg-opacity-10 border-secondary' : 'bg-white shadow-sm border-light'}`}>
-                       <div className="card-body p-4">
-                         <div className="d-flex justify-content-between mb-3">
-                           <span className="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-10 py-2 px-3">{r.fecha}</span>
-                           <span className={`badge rounded-pill ${r.estadoCx === 'Realizada' ? 'bg-success' : 'bg-warning text-dark'}`}>{r.estadoCx}</span>
-                         </div>
-                         <h4 className="fw-black">{r.paciente}</h4>
-                         <p className="text-secondary small"><MapPin size={12} className="me-1"/> {r.institucion}</p>
-                         <hr className="opacity-10"/>
-                         <div className="glass-panel p-3 rounded-4 mb-3">
-                            <div className="d-flex justify-content-between small opacity-75"><span>Bruto:</span><span>${f.bruto.toLocaleString()}</span></div>
-                            <div className="d-flex justify-content-between small text-danger"><span>Retención:</span><span>-${f.retencion.toLocaleString()}</span></div>
-                            <div className="d-flex justify-content-between fw-black text-success h5 mt-2 pt-2 border-top border-secondary border-opacity-10">
-                               <span>Líquido:</span><span>${f.liquido.toLocaleString()}</span>
+              <div className={selectedDayRecords ? "col-lg-8" : "col-12"}>
+                <div className="calendar-grid d-grid" style={{ gridTemplateColumns: 'repeat(7, 1fr)', gap: '8px' }}>
+                  {['Dom', 'Lun', 'Mar', 'Mie', 'Jue', 'Vie', 'Sab'].map(d => ( <div key={d} className="text-center fw-bold text-muted small py-2">{d}</div> ))}
+                  {calendarDays.map((d, i) => (
+                    <div key={i} className={`calendar-cell p-2 ${d.day ? (darkMode ? 'bg-dark' : 'bg-white') : 'bg-transparent border-0'} ${d.records?.length > 0 ? 'border-primary border-opacity-50 shadow-sm' : ''}`} style={d.records?.length > 0 ? {backgroundColor: darkMode ? '#1e293b' : '#f0f7ff'} : {}}>
+                      {d.day && (
+                        <>
+                          <div className="d-flex justify-content-between align-items-center mb-1">
+                            <span className={`fw-bold small ${d.records?.length > 0 ? 'text-primary' : 'text-contrast-fix'}`}>{d.day}</span>
+                            <button onClick={(e) => { e.stopPropagation(); openFormWithDate(d.date); }} className="day-add-btn"><Plus size={14} /></button>
+                          </div>
+                          <div onClick={() => setSelectedDayRecords(d)} style={{ cursor: 'pointer', minHeight: '60px' }}>
+                            {d.records?.slice(0, 2).map((r, idx) => (
+                              <div key={idx} className="bg-primary bg-opacity-10 text-primary small px-2 py-1 rounded mb-1 text-truncate fw-bold" style={{ fontSize: '9px' }}>{r.paciente}</div>
+                            ))}
+                            {d.records?.length > 2 && <div className="text-muted-fix text-center fw-bold" style={{ fontSize: '8px' }}>+{d.records.length - 2}</div>}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {selectedDayRecords && (
+                <div className="col-lg-4 animate-fade">
+                  <div className={`card glass-card h-100 shadow-lg ${darkMode ? 'border-secondary' : ''}`}>
+                    <div className="card-body p-4">
+                      <div className="d-flex justify-content-between mb-3">
+                        <h4 className="fw-bold text-contrast-fix m-0">Día {selectedDayRecords.date.split('-').reverse().join('/')}</h4>
+                        <button className={`btn-close ${darkMode ? 'btn-close-white' : ''}`} onClick={() => setSelectedDayRecords(null)}></button>
+                      </div>
+
+                      {/* RESUMEN FINANCIERO DEL DÍA */}
+                      {selectedDayFinance.bruto > 0 && (
+                        <div className={`p-3 rounded-4 mb-4 border ${darkMode ? 'bg-success bg-opacity-10 border-success border-opacity-25' : 'bg-success bg-opacity-10 border-success border-opacity-10'}`}>
+                           <div className="d-flex align-items-center gap-2 mb-2">
+                             <Receipt size={18} className="text-success"/>
+                             <span className="fw-bold text-success small">Resumen Diario</span>
+                           </div>
+                           <div className="d-flex justify-content-between small mb-1">
+                             <span className="text-muted-fix">Total Bruto:</span>
+                             <span className="fw-bold text-contrast-fix">${selectedDayFinance.bruto.toLocaleString()}</span>
+                           </div>
+                           <div className="d-flex justify-content-between small mb-1">
+                             <span className="text-muted-fix">Retención ({(TAX_RATE*100).toFixed(2)}%):</span>
+                             <span className="fw-bold text-danger">-${selectedDayFinance.retencion.toLocaleString(undefined, {maximumFractionDigits: 0})}</span>
+                           </div>
+                           <hr className="my-2 opacity-10" />
+                           <div className="d-flex justify-content-between align-items-center">
+                             <span className="fw-bold text-success small">LÍQUIDO:</span>
+                             <span className="h5 fw-bold text-success m-0">${selectedDayFinance.liquido.toLocaleString(undefined, {maximumFractionDigits: 0})}</span>
+                           </div>
+                        </div>
+                      )}
+
+                      <button onClick={() => openFormWithDate(selectedDayRecords.date)} className="btn btn-primary w-100 mb-4 rounded-pill fw-bold"><Plus size={18} className="me-2"/> Nueva en este día</button>
+                      
+                      <div className="records-list" style={{ maxHeight: '400px', overflowY: 'auto' }}>
+                        {selectedDayRecords.records.length === 0 ? (
+                          <p className="text-center text-muted small py-4">No hay cirugías programadas</p>
+                        ) : (
+                          selectedDayRecords.records.map((r, idx) => (
+                            <div key={idx} className="border-bottom border-secondary border-opacity-10 pb-3 mb-3 last-child-border-0">
+                              <div className="d-flex justify-content-between fw-bold text-contrast-fix mb-1">
+                                <span><Clock size={14} className="me-1"/>{r.hora}</span>
+                                <span className="text-primary">${Number(r.valorBruto).toLocaleString()}</span>
+                              </div>
+                              <div className="text-contrast-fix fw-bold small">{r.paciente}</div>
+                              <div className="text-muted-fix x-small mt-1" style={{ fontSize: '11px' }}>{r.tipoCx} • {r.institucion}</div>
                             </div>
-                         </div>
-                         <div className="d-flex justify-content-end gap-2">
-                           <button onClick={() => startEdit(r)} className="btn btn-sm btn-outline-primary rounded-circle p-2"><Edit3 size={18}/></button>
-                           <button onClick={() => setRecords(records.filter(x => x.id !== r.id))} className="btn btn-sm btn-outline-danger rounded-circle p-2"><Trash2 size={18}/></button>
-                         </div>
-                       </div>
-                     </div>
-                   </div>
-                 );
-               })}
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}
 
-        {/* DASHBOARD */}
+        {/* ANÁLISIS (HISTÓRICO CUALQUIER MES/AÑO) */}
         {view === 'dashboard' && (
-          <div className="animate__animated animate__fadeIn">
-             <div className="d-flex justify-content-between align-items-center mb-5">
-                <h2 className="fw-black h1">Dashboard Financiero</h2>
-                <button onClick={() => setShowFinances(!showFinances)} className="btn btn-outline-primary rounded-pill px-4 fw-bold d-flex align-items-center gap-2">
-                  {showFinances ? <EyeOff size={18}/> : <Eye size={18}/>}
-                  {showFinances ? 'Ocultar Datos' : 'Ver Datos'}
-                </button>
-             </div>
-             <div className="row g-4 mb-5 text-white">
-                <div className="col-md-4">
-                   <div className="p-5 rounded-5 bg-primary bg-gradient shadow-lg">
-                      <p className="small fw-bold opacity-75 mb-1 text-uppercase">Total Ingresos Brutos</p>
-                      <h2 className="display-4 fw-black">{showFinances ? `$${records.reduce((a, b) => a + (Number(b.valorBruto) || 0), 0).toLocaleString()}` : '$ ••••••'}</h2>
-                   </div>
+          <div className="animate-fade">
+            <div className="d-flex flex-column flex-md-row justify-content-between align-items-center mb-4 gap-3">
+              <h2 className="fw-bold text-contrast-fix m-0">Análisis Financiero</h2>
+              <div className="d-flex gap-2">
+                <select className={`form-select form-select-sm rounded-pill px-3 fw-bold ${darkMode ? 'bg-nav-cal' : ''}`} 
+                        value={selectedAnalysisDate.getMonth()} 
+                        onChange={e => setSelectedAnalysisDate(new Date(selectedAnalysisDate.getFullYear(), parseInt(e.target.value), 1))}>
+                  {['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'].map((m, i) => <option key={i} value={i}>{m}</option>)}
+                </select>
+                <select className={`form-select form-select-sm rounded-pill px-3 fw-bold ${darkMode ? 'bg-nav-cal' : ''}`} 
+                        value={selectedAnalysisDate.getFullYear()} 
+                        onChange={e => setSelectedAnalysisDate(new Date(parseInt(e.target.value), selectedAnalysisDate.getMonth(), 1))}>
+                  {[...Array(10)].map((_, i) => { const y = new Date().getFullYear() - 5 + i; return <option key={y} value={y}>{y}</option>; })}
+                </select>
+              </div>
+            </div>
+
+            <div className={`glass-card p-4 p-md-5 shadow-lg mb-4`}>
+              <div className="row align-items-center">
+                <div className="col-lg-7">
+                  <h4 className="text-primary fw-bold mb-4"><PieChart size={24} className="me-2"/> Resumen de {selectedAnalysisDate.toLocaleString('es-ES', { month: 'long', year: 'numeric' })}</h4>
+                  <div className="row g-3">
+                    <div className="col-6"><div className="p-4 rounded-4 bg-secondary bg-opacity-10"><span className="d-block text-muted-fix small fw-bold mb-1">CIRUGÍAS</span><span className="h3 fw-bold text-contrast-fix">{statsPeriodo.count}</span></div></div>
+                    <div className="col-6"><div className="p-4 rounded-4 bg-primary bg-opacity-10"><span className="d-block text-muted-fix small fw-bold mb-1">TOTAL BRUTO</span><span className="h3 fw-bold text-contrast-fix">${statsPeriodo.bruto.toLocaleString()}</span></div></div>
+                  </div>
                 </div>
-                <div className="col-md-4">
-                   <div className="p-5 rounded-5 bg-dark border border-secondary shadow-lg">
-                      <p className="small fw-bold opacity-75 mb-1 text-uppercase text-danger">Impuestos (15%)</p>
-                      <h2 className="display-4 fw-black text-danger">{showFinances ? `-$${(records.reduce((a, b) => a + (Number(b.valorBruto) || 0), 0) * 0.15).toLocaleString()}` : '$ ••••••'}</h2>
-                   </div>
+                <div className="col-lg-5 text-lg-end mt-4 mt-lg-0 border-lg-start ps-lg-5">
+                  <span className="text-muted-fix fw-bold small">MONTO NETO LIQUIDO</span>
+                  <h2 className="display-5 fw-bold text-success mt-2">${statsPeriodo.liquido.toLocaleString(undefined, {maximumFractionDigits: 0})}</h2>
+                  <div className="badge bg-danger bg-opacity-10 text-danger p-2 px-3 rounded-pill fw-bold">Retención Automática ({(TAX_RATE*100).toFixed(2)}%): -${statsPeriodo.retencion.toLocaleString(undefined, {maximumFractionDigits: 0})}</div>
+                  <button onClick={() => exportToExcel(statsPeriodo.filteredRecords, `Reporte_${selectedAnalysisDate.getMonth()+1}_${selectedAnalysisDate.getFullYear()}`)} className="btn btn-outline-success btn-sm w-100 mt-4 rounded-pill fw-bold"><FileSpreadsheet size={16}/> Exportar Excel</button>
                 </div>
-                <div className="col-md-4">
-                   <div className="p-5 rounded-5 bg-success bg-gradient shadow-lg">
-                      <p className="small fw-bold opacity-75 mb-1 text-uppercase">Ganancia Líquida MJ</p>
-                      <h2 className="display-4 fw-black">{showFinances ? `$${(records.reduce((a, b) => a + (Number(b.valorBruto) || 0), 0) * 0.85).toLocaleString()}` : '$ ••••••'}</h2>
-                   </div>
-                </div>
-             </div>
+              </div>
+            </div>
           </div>
         )}
 
-        {/* FORMULARIO */}
-        {view === 'form' && (
-          <div className="d-flex justify-content-center py-4">
-             <div className={`card border-0 shadow-2xl rounded-5 w-100 ${darkMode ? 'bg-secondary bg-opacity-10' : 'bg-white shadow-lg'}`} style={{ maxWidth: '700px' }}>
-                <div className="card-body p-4 p-md-5">
-                   <h2 className="fw-black text-center mb-5">{editingId ? 'Editar' : 'Nueva'} Cirugía</h2>
-                   <form onSubmit={handleSubmit} className="row g-4">
-                      <div className="col-md-6">
-                        <label className="form-label fw-bold small ls-2">FECHA</label>
-                        <input type="date" value={formData.fecha} onChange={(e) => setFormData({...formData, fecha: e.target.value})} className="form-control p-3 rounded-4" required />
-                      </div>
-                      <div className="col-md-6">
-                        <label className="form-label fw-bold small ls-2">HORA</label>
-                        <input type="time" value={formData.hora} onChange={(e) => setFormData({...formData, hora: e.target.value})} className="form-control p-3 rounded-4" required />
-                      </div>
-                      <div className="col-12">
-                        <label className="form-label fw-bold small ls-2">NOMBRE DEL PACIENTE</label>
-                        <input type="text" placeholder="Ej: Juan Pérez" value={formData.paciente} onChange={(e) => setFormData({...formData, paciente: e.target.value})} className="form-control p-3 rounded-4" required />
-                      </div>
-                      <div className="col-12">
-                        <label className="form-label fw-bold small ls-2">TIPO DE INTERVENCIÓN</label>
-                        <input type="text" placeholder="Ej: Colecistectomía" value={formData.tipoCx} onChange={(e) => setFormData({...formData, tipoCx: e.target.value})} className="form-control p-3 rounded-4" required />
-                      </div>
-                      <div className="col-12">
-                        <label className="form-label fw-bold small ls-2">CENTRO MÉDICO</label>
-                        <input type="text" placeholder="Ej: Clínica Santa María" value={formData.institucion} onChange={(e) => setFormData({...formData, institucion: e.target.value})} className="form-control p-3 rounded-4" required />
-                      </div>
-                      <div className="col-md-6">
-                        <label className="form-label fw-bold small ls-2">VALOR BRUTO ($)</label>
-                        <input type="number" placeholder="Monto total" value={formData.valorBruto} onChange={(e) => setFormData({...formData, valorBruto: e.target.value})} className="form-control p-3 rounded-4 fw-bold text-primary" required />
-                      </div>
-                      <div className="col-md-6">
-                        <label className="form-label fw-bold small ls-2">ESTADO</label>
-                        <select value={formData.estadoCx} onChange={(e) => setFormData({...formData, estadoCx: e.target.value})} className="form-select p-3 rounded-4">
-                          <option>Programada</option>
-                          <option>Realizada</option>
-                          <option>Cancelada</option>
-                        </select>
-                      </div>
-
-                      <div className="col-12 mt-5 d-flex gap-3">
-                        <button type="button" onClick={() => setView('calendar')} className="btn btn-outline-secondary flex-grow-1 p-3 rounded-pill fw-bold">Volver</button>
-                        <button type="submit" className="btn btn-primary flex-grow-1 p-3 rounded-pill fw-bold shadow">Guardar Cambios</button>
-                      </div>
-                   </form>
+        {/* HISTORIAL CON FILTROS */}
+        {view === 'history' && (
+          <div className="animate-fade">
+            <div className="d-flex flex-column flex-lg-row justify-content-between align-items-start align-items-lg-center mb-4 gap-3">
+              <h2 className="fw-bold text-contrast-fix m-0">Historial</h2>
+              <div className="d-flex flex-wrap gap-2 w-100 w-lg-auto">
+                <div className="position-relative flex-grow-1" style={{ minWidth: '250px' }}>
+                  <Search className="position-absolute top-50 start-0 translate-middle-y ms-3 text-muted" size={18} />
+                  <input type="text" className="form-control ps-5 rounded-pill" placeholder="Buscar por paciente, clínica..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
                 </div>
-             </div>
+                <button onClick={() => { setSearchTerm(''); setDateRange({start:'', end:''}) }} className={`btn rounded-pill fw-bold ${darkMode ? 'btn-outline-secondary' : 'btn-light border'}`}>Limpiar</button>
+              </div>
+            </div>
+
+            <div className={`glass-card p-3 mb-4 shadow-sm border-0 d-flex flex-wrap align-items-center gap-3 ${darkMode ? 'bg-secondary bg-opacity-10' : 'bg-white'}`}>
+              <div className="d-flex align-items-center gap-2">
+                <Filter size={16} className="text-primary"/>
+                <span className="small fw-bold text-muted-fix">RANGO DE FECHAS:</span>
+              </div>
+              <div className="d-flex align-items-center gap-2">
+                <input type="date" className="form-control form-control-sm rounded-pill" value={dateRange.start} onChange={e => setDateRange({...dateRange, start: e.target.value})} />
+                <ArrowRight size={14} className="text-muted" />
+                <input type="date" className="form-control form-control-sm rounded-pill" value={dateRange.end} onChange={e => setDateRange({...dateRange, end: e.target.value})} />
+              </div>
+              <div className="ms-auto">
+                <span className="badge bg-primary rounded-pill px-3">{filteredHistory.length} registros</span>
+              </div>
+            </div>
+
+            <div className="row g-4">
+              {filteredHistory.length === 0 ? (
+                <div className="col-12 text-center py-5"><ClipboardList size={60} className="text-muted opacity-25 mb-3" /><p className="text-muted-fix h5">No hay registros que coincidan.</p></div>
+              ) : (
+                filteredHistory.map(r => {
+                  const f = calculateFinance(r.valorBruto);
+                  return (
+                    <div className="col-md-6 col-xl-4" key={r.id}>
+                      <div className={`card h-100 shadow-sm border-0 ${darkMode ? 'bg-dark border-secondary' : 'bg-white'}`} style={{ borderRadius: '20px' }}>
+                        <div className="card-body p-4">
+                          <div className="d-flex justify-content-between mb-2">
+                            <span className="badge bg-primary bg-opacity-10 text-primary py-2 px-3 fw-bold rounded-pill">{r.fecha}</span>
+                            <span className="text-muted small">#{r.id.split('-')[1].slice(-4)}</span>
+                          </div>
+                          <h5 className="fw-bold text-contrast-fix mb-1">{r.paciente}</h5>
+                          <p className="text-primary small mb-3 fw-bold">{r.tipoCx}</p>
+                          <div className={`p-3 rounded-4 mb-3 ${darkMode ? 'bg-secondary bg-opacity-10' : 'bg-light'}`}>
+                            <div className="d-flex justify-content-between small"><span>Bruto:</span><span className="fw-bold text-contrast-fix">${f.bruto.toLocaleString()}</span></div>
+                            <div className="d-flex justify-content-between small text-success fw-bold mt-1"><span>Neto ({(100 - TAX_RATE*100).toFixed(2)}%):</span><span>${f.liquido.toLocaleString(undefined, {maximumFractionDigits:0})}</span></div>
+                          </div>
+                          <div className="d-flex justify-content-between align-items-center">
+                            <span className="small text-muted-fix"><MapPin size={12} className="me-1"/>{r.institucion}</span>
+                            <div className="d-flex gap-1">
+                              <button onClick={() => { setFormData(r); setEditingId(r.id); setView('form'); }} className="btn btn-sm btn-outline-primary rounded-circle p-2"><Edit3 size={16}/></button>
+                              <button onClick={() => { if(confirm('¿Eliminar registro?')) setRecords(records.filter(x => x.id !== r.id)) }} className="btn btn-sm btn-outline-danger rounded-circle p-2"><Trash2 size={16}/></button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* HOME */}
+        {view === 'home' && (
+          <div className="text-center py-5 animate-fade">
+            <h1 className="display-4 fw-bold text-contrast-fix mb-3">Dra. <span className="text-primary">Maria Joaquina</span></h1>
+            <p className="lead text-muted-fix mb-5">Gestión de Honorarios e Impuestos Quirúrgicos.</p>
+            <div className="row justify-content-center g-4 px-2">
+              {[ { v: 'form', i: <PlusCircle size={40}/>, t: 'Registrar Cx', c: 'text-primary' }, 
+                 { v: 'calendar', i: <CalendarIcon size={40}/>, t: 'Ver Agenda', c: 'text-info' },
+                 { v: 'history', i: <ClipboardList size={40}/>, t: 'Historial', c: 'text-success' },
+                 { v: 'dashboard', i: <TrendingUp size={40}/>, t: 'Reporte Mensual', c: 'text-warning' }
+              ].map(item => (
+                <div key={item.v} className="col-6 col-md-3">
+                  <div onClick={() => setView(item.v)} className="card p-4 glass-card h-100 cursor-pointer shadow-sm border-0 border-hover">
+                    <div className={item.c + " mx-auto mb-3"}>{item.i}</div>
+                    <h6 className="fw-bold text-contrast-fix">{item.t}</h6>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
       </main>
 
-      <Footer darkMode={darkMode} />
+      <footer className={`py-4 mt-auto border-top ${darkMode ? 'bg-dark border-secondary' : 'bg-white border-light'}`}>
+        <div className="container text-center">
+          <p className="small text-muted-fix mb-0 fw-bold opacity-75">SurgiTrack Pro Elite v9.1 • Dra. Maria Joaquina • Impuestos: {(TAX_RATE*100).toFixed(2)}%</p>
+        </div>
+      </footer>
     </div>
   );
 }
