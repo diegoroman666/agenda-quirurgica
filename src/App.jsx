@@ -3,7 +3,7 @@ import {
   Plus,
   Trash2, 
   ClipboardList, 
-  Moon,
+  Moon, 
   Sun,
   Edit3,
   Clock,
@@ -15,16 +15,19 @@ import {
   Calendar as CalendarIcon,
   PieChart,
   FileSpreadsheet,
+  FileText,
   PlusCircle,
   X,
   Search,
   Filter,
   ArrowRight,
-  Receipt
+  Receipt,
+  RotateCcw
 } from 'lucide-react';
 
 const XLSX_SCRIPT_URL = "https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js";
-const TAX_RATE = 0.1525; // 15.25% solicitado
+const JSPDF_SCRIPT_URL = "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js";
+const TAX_RATE = 0.1525; // 15.25%
 
 const Navbar = ({ view, setView, darkMode, setDarkMode }) => (
   <nav className={`navbar sticky-top border-bottom px-2 py-2 px-md-3 py-md-3 ${darkMode ? 'navbar-dark bg-dark border-secondary' : 'navbar-light bg-white border-light'}`} 
@@ -78,18 +81,21 @@ export default function App() {
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
 
   const [records, setRecords] = useState(() => {
-    const saved = localStorage.getItem('mj_surgical_v9_1');
+    const saved = localStorage.getItem('mj_surgical_v9_2');
     return saved ? JSON.parse(saved) : [];
   });
 
   useEffect(() => {
-    localStorage.setItem('mj_surgical_v9_1', JSON.stringify(records));
+    localStorage.setItem('mj_surgical_v9_2', JSON.stringify(records));
   }, [records]);
 
   useEffect(() => {
-    const script = document.createElement("script");
-    script.src = XLSX_SCRIPT_URL;
-    document.head.appendChild(script);
+    const scripts = [XLSX_SCRIPT_URL, JSPDF_SCRIPT_URL];
+    scripts.forEach(url => {
+      const script = document.createElement("script");
+      script.src = url;
+      document.head.appendChild(script);
+    });
   }, []);
 
   const calculateFinance = (bruto) => {
@@ -105,10 +111,14 @@ export default function App() {
     institucion: '',
     paciente: '',
     tipoCx: '',
-    valorBruto: ''
+    valorBruto: '',
+    deleted: false
   };
 
   const [formData, setFormData] = useState(initialForm);
+
+  const activeRecords = useMemo(() => records.filter(r => !r.deleted), [records]);
+  const trashedRecords = useMemo(() => records.filter(r => r.deleted), [records]);
 
   const openFormWithDate = (dateStr) => {
     setEditingId(null);
@@ -136,19 +146,58 @@ export default function App() {
     window.XLSX.writeFile(workbook, `${filename}.xlsx`);
   };
 
+  const exportToPDF = (stats, date) => {
+    if (!window.jspdf) return;
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    const mes = date.toLocaleString('es-ES', { month: 'long', year: 'numeric' });
+
+    doc.setFontSize(22);
+    doc.setTextColor(13, 110, 253);
+    doc.text("SurgiTrack Pro Elite", 20, 25);
+    
+    doc.setFontSize(12);
+    doc.setTextColor(100);
+    doc.text(`Reporte Financiero Mensual: ${mes}`, 20, 35);
+    doc.text(`Dra. Maria Joaquina`, 20, 42);
+
+    doc.setDrawColor(200);
+    doc.line(20, 50, 190, 50);
+
+    doc.setFontSize(14);
+    doc.setTextColor(0);
+    doc.text("Resumen de Ingresos", 20, 65);
+    
+    doc.setFontSize(11);
+    doc.text(`Total de Procedimientos: ${stats.count}`, 30, 75);
+    doc.text(`Total Ingresos Brutos: $${stats.bruto.toLocaleString()}`, 30, 85);
+    doc.setTextColor(220, 53, 69);
+    doc.text(`Retención de Impuestos (${(TAX_RATE * 100).toFixed(2)}%): -$${stats.retencion.toLocaleString(undefined, {maximumFractionDigits: 0})}`, 30, 95);
+    
+    doc.setFontSize(16);
+    doc.setTextColor(25, 135, 84);
+    doc.text(`TOTAL LÍQUIDO PERCIBIDO: $${stats.liquido.toLocaleString(undefined, {maximumFractionDigits: 0})}`, 20, 115);
+
+    doc.setFontSize(10);
+    doc.setTextColor(150);
+    doc.text("Generado automáticamente por SurgiTrack Pro Elite v9.2", 20, 280);
+
+    doc.save(`Reporte_Financiero_${mes.replace(' ', '_')}.pdf`);
+  };
+
   const statsPeriodo = useMemo(() => {
     const month = selectedAnalysisDate.getMonth();
     const year = selectedAnalysisDate.getFullYear();
-    const filtered = records.filter(r => {
+    const filtered = activeRecords.filter(r => {
       const d = new Date(r.fecha + "T00:00:00");
       return d.getMonth() === month && d.getFullYear() === year;
     });
     const bruto = filtered.reduce((acc, curr) => acc + (parseFloat(curr.valorBruto) || 0), 0);
     return { bruto, retencion: bruto * TAX_RATE, liquido: bruto * (1 - TAX_RATE), count: filtered.length, filteredRecords: filtered };
-  }, [records, selectedAnalysisDate]);
+  }, [activeRecords, selectedAnalysisDate]);
 
   const filteredHistory = useMemo(() => {
-    return records.filter(r => {
+    return activeRecords.filter(r => {
       const matchesSearch = 
         r.paciente.toLowerCase().includes(searchTerm.toLowerCase()) ||
         r.tipoCx.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -161,7 +210,7 @@ export default function App() {
       
       return matchesSearch && matchesDate;
     });
-  }, [records, searchTerm, dateRange]);
+  }, [activeRecords, searchTerm, dateRange]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -175,6 +224,26 @@ export default function App() {
     setView('history');
   };
 
+  const softDelete = (id) => {
+    setRecords(prev => prev.map(r => r.id === id ? { ...r, deleted: true } : r));
+    if(selectedDayRecords) {
+        setSelectedDayRecords(prev => ({
+            ...prev,
+            records: prev.records.filter(r => r.id !== id)
+        }));
+    }
+  };
+
+  const restoreRecord = (id) => {
+    setRecords(prev => prev.map(r => r.id === id ? { ...r, deleted: false } : r));
+  };
+
+  const hardDelete = (id) => {
+    if(confirm('¿Eliminar definitivamente de la papelera?')) {
+      setRecords(prev => prev.filter(r => r.id !== id));
+    }
+  };
+
   const calendarDays = useMemo(() => {
     const year = currentCalDate.getFullYear();
     const month = currentCalDate.getMonth();
@@ -184,12 +253,11 @@ export default function App() {
     for (let i = 0; i < firstDay; i++) days.push({ day: null });
     for (let i = 1; i <= daysInMonth; i++) {
       const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
-      days.push({ day: i, date: dateStr, records: records.filter(r => r.fecha === dateStr) });
+      days.push({ day: i, date: dateStr, records: activeRecords.filter(r => r.fecha === dateStr) });
     }
     return days;
-  }, [currentCalDate, records]);
+  }, [currentCalDate, activeRecords]);
 
-  // Resumen financiero del día seleccionado
   const selectedDayFinance = useMemo(() => {
     if (!selectedDayRecords) return null;
     const bruto = selectedDayRecords.records.reduce((acc, curr) => acc + (parseFloat(curr.valorBruto) || 0), 0);
@@ -221,32 +289,52 @@ export default function App() {
           border-radius: 24px;
         }
 
-        .calendar-cell { min-height: 100px; border-radius: 12px; transition: 0.2s; position: relative; border: 1px solid ${darkMode ? '#222' : '#eee'}; }
-        .calendar-cell:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
-        .calendar-cell:hover .day-add-btn { opacity: 1; }
-        
-        .day-add-btn {
-          position: absolute; top: 4px; right: 4px; width: 22px; height: 22px; border-radius: 50%;
-          display: flex; align-items: center; justify-content: center; opacity: 0; transition: 0.2s; border: none;
-          background-color: ${darkMode ? '#334155' : '#e2e8f0'};
-          color: ${darkMode ? '#fff' : '#0d6efd'};
+        .calendar-cell { 
+          min-height: 100px; 
+          border-radius: 12px; 
+          transition: 0.2s; 
+          border: 1px solid ${darkMode ? '#222' : '#eee'}; 
+          padding: 8px;
         }
-        .day-add-btn:hover { opacity: 1 !important; transform: scale(1.1); background: #0d6efd !important; color: white !important; }
+
+        /* METODO FORZADO PARA BOTON CIRCULAR PERFECTO */
+        .btn-circular-add {
+          width: 26px !important;
+          height: 26px !important;
+          min-width: 26px !important;
+          min-height: 26px !important;
+          max-width: 26px !important;
+          max-height: 26px !important;
+          border-radius: 50% !important;
+          padding: 0 !important;
+          display: flex !important;
+          align-items: center !important;
+          justify-content: center !important;
+          border: none !important;
+          background-color: #0d6efd !important;
+          color: #ffffff !important;
+          cursor: pointer !important;
+          transition: transform 0.2s, background-color 0.2s;
+          box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+          flex-shrink: 0;
+        }
+        
+        .btn-circular-add:hover {
+          background-color: #0b5ed7 !important;
+          transform: scale(1.1);
+        }
 
         .btn-plus-float {
           position: fixed; bottom: 30px; right: 30px; width: 60px; height: 60px; border-radius: 50%;
           z-index: 1000; display: flex; align-items: center; justify-content: center;
           box-shadow: 0 10px 25px rgba(13, 110, 253, 0.4); transition: 0.3s;
+          color: #ffffff !important;
         }
         
-        /* Arreglo contraste botones navegación */
         .btn-nav-cal {
            background-color: ${darkMode ? '#2a2a35' : '#f8f9fa'};
            color: ${darkMode ? '#ffffff' : '#333333'};
            border: 1px solid ${darkMode ? '#3f3f46' : '#dee2e6'};
-        }
-        .btn-nav-cal:hover {
-           background-color: ${darkMode ? '#3f3f46' : '#e9ecef'};
         }
 
         .animate-fade { animation: fadeIn 0.3s ease forwards; }
@@ -256,7 +344,7 @@ export default function App() {
       <Navbar view={view} setView={setView} darkMode={darkMode} setDarkMode={setDarkMode} />
 
       <button onClick={() => { setEditingId(null); setFormData(initialForm); setView('form'); }} className="btn btn-primary btn-plus-float">
-        <Plus size={32} />
+        <Plus size={32} strokeWidth={3} />
       </button>
 
       <main className="container-fluid px-3 px-md-5 py-4 flex-grow-1">
@@ -273,7 +361,7 @@ export default function App() {
                 <button onClick={() => setView('calendar')} className={`btn rounded-circle p-2 border-0 ${darkMode ? 'text-light' : 'text-dark'}`}><X size={24} /></button>
               </div>
 
-              <form onSubmit={handleSubmit} className="row g-3">
+              <form onSubmit={handleSubmit} className="row g-3 text-start">
                 <div className="col-md-6"><label className="form-label fw-bold text-contrast-fix small">FECHA</label>
                   <input type="date" className="form-control" value={formData.fecha} onChange={e => setFormData({...formData, fecha: e.target.value})} required /></div>
                 <div className="col-md-6"><label className="form-label fw-bold text-contrast-fix small">HORA</label>
@@ -311,14 +399,21 @@ export default function App() {
                 <div className="calendar-grid d-grid" style={{ gridTemplateColumns: 'repeat(7, 1fr)', gap: '8px' }}>
                   {['Dom', 'Lun', 'Mar', 'Mie', 'Jue', 'Vie', 'Sab'].map(d => ( <div key={d} className="text-center fw-bold text-muted small py-2">{d}</div> ))}
                   {calendarDays.map((d, i) => (
-                    <div key={i} className={`calendar-cell p-2 ${d.day ? (darkMode ? 'bg-dark' : 'bg-white') : 'bg-transparent border-0'} ${d.records?.length > 0 ? 'border-primary border-opacity-50 shadow-sm' : ''}`} style={d.records?.length > 0 ? {backgroundColor: darkMode ? '#1e293b' : '#f0f7ff'} : {}}>
+                    <div key={i} className={`calendar-cell ${d.day ? (darkMode ? 'bg-dark' : 'bg-white') : 'bg-transparent border-0'} ${d.records?.length > 0 ? 'border-primary border-opacity-50 shadow-sm' : ''}`} style={d.records?.length > 0 ? {backgroundColor: darkMode ? '#1e293b' : '#f0f7ff'} : {}}>
                       {d.day && (
                         <>
-                          <div className="d-flex justify-content-between align-items-center mb-1">
+                          <div className="d-flex justify-content-between align-items-start mb-2">
                             <span className={`fw-bold small ${d.records?.length > 0 ? 'text-primary' : 'text-contrast-fix'}`}>{d.day}</span>
-                            <button onClick={(e) => { e.stopPropagation(); openFormWithDate(d.date); }} className="day-add-btn"><Plus size={14} /></button>
+                            {/* BOTON CORREGIDO INTEGRADO EN EL FLEXBOX SUPERIOR */}
+                            <button 
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); openFormWithDate(d.date); }} 
+                              className="btn-circular-add"
+                            >
+                              <Plus size={16} strokeWidth={4} />
+                            </button>
                           </div>
-                          <div onClick={() => setSelectedDayRecords(d)} style={{ cursor: 'pointer', minHeight: '60px' }}>
+                          <div onClick={() => setSelectedDayRecords(d)} style={{ cursor: 'pointer', minHeight: '50px' }}>
                             {d.records?.slice(0, 2).map((r, idx) => (
                               <div key={idx} className="bg-primary bg-opacity-10 text-primary small px-2 py-1 rounded mb-1 text-truncate fw-bold" style={{ fontSize: '9px' }}>{r.paciente}</div>
                             ))}
@@ -334,13 +429,12 @@ export default function App() {
               {selectedDayRecords && (
                 <div className="col-lg-4 animate-fade">
                   <div className={`card glass-card h-100 shadow-lg ${darkMode ? 'border-secondary' : ''}`}>
-                    <div className="card-body p-4">
+                    <div className="card-body p-4 text-start">
                       <div className="d-flex justify-content-between mb-3">
                         <h4 className="fw-bold text-contrast-fix m-0">Día {selectedDayRecords.date.split('-').reverse().join('/')}</h4>
                         <button className={`btn-close ${darkMode ? 'btn-close-white' : ''}`} onClick={() => setSelectedDayRecords(null)}></button>
                       </div>
 
-                      {/* RESUMEN FINANCIERO DEL DÍA */}
                       {selectedDayFinance.bruto > 0 && (
                         <div className={`p-3 rounded-4 mb-4 border ${darkMode ? 'bg-success bg-opacity-10 border-success border-opacity-25' : 'bg-success bg-opacity-10 border-success border-opacity-10'}`}>
                            <div className="d-flex align-items-center gap-2 mb-2">
@@ -389,9 +483,9 @@ export default function App() {
           </div>
         )}
 
-        {/* ANÁLISIS (HISTÓRICO CUALQUIER MES/AÑO) */}
+        {/* ANÁLISIS */}
         {view === 'dashboard' && (
-          <div className="animate-fade">
+          <div className="animate-fade text-start">
             <div className="d-flex flex-column flex-md-row justify-content-between align-items-center mb-4 gap-3">
               <h2 className="fw-bold text-contrast-fix m-0">Análisis Financiero</h2>
               <div className="d-flex gap-2">
@@ -421,16 +515,59 @@ export default function App() {
                   <span className="text-muted-fix fw-bold small">MONTO NETO LIQUIDO</span>
                   <h2 className="display-5 fw-bold text-success mt-2">${statsPeriodo.liquido.toLocaleString(undefined, {maximumFractionDigits: 0})}</h2>
                   <div className="badge bg-danger bg-opacity-10 text-danger p-2 px-3 rounded-pill fw-bold">Retención Automática ({(TAX_RATE*100).toFixed(2)}%): -${statsPeriodo.retencion.toLocaleString(undefined, {maximumFractionDigits: 0})}</div>
-                  <button onClick={() => exportToExcel(statsPeriodo.filteredRecords, `Reporte_${selectedAnalysisDate.getMonth()+1}_${selectedAnalysisDate.getFullYear()}`)} className="btn btn-outline-success btn-sm w-100 mt-4 rounded-pill fw-bold"><FileSpreadsheet size={16}/> Exportar Excel</button>
+                  
+                  <div className="d-flex gap-2 mt-4">
+                    <button onClick={() => exportToExcel(statsPeriodo.filteredRecords, `Reporte_${selectedAnalysisDate.getMonth()+1}_${selectedAnalysisDate.getFullYear()}`)} className="btn btn-outline-success btn-sm flex-grow-1 rounded-pill fw-bold"><FileSpreadsheet size={16} className="me-1"/> Excel</button>
+                    <button onClick={() => exportToPDF(statsPeriodo, selectedAnalysisDate)} className="btn btn-outline-danger btn-sm flex-grow-1 rounded-pill fw-bold"><FileText size={16} className="me-1"/> Plantilla PDF</button>
+                  </div>
                 </div>
+              </div>
+            </div>
+
+            {/* PAPELERA */}
+            <div className="mt-5">
+              <div className="d-flex align-items-center gap-2 mb-3">
+                <Trash2 className="text-danger" size={20}/>
+                <h5 className="fw-bold m-0 text-contrast-fix">Papelera de Reciclaje</h5>
+              </div>
+              <div className="glass-card p-3 p-md-4 shadow-sm">
+                {trashedRecords.length === 0 ? (
+                   <p className="text-muted small m-0 text-center py-3">La papelera está vacía.</p>
+                ) : (
+                  <div className="table-responsive">
+                    <table className={`table ${darkMode ? 'table-dark' : 'table-light'} table-hover align-middle mb-0`}>
+                      <thead>
+                        <tr className="small text-muted">
+                          <th>PACIENTE</th>
+                          <th>FECHA</th>
+                          <th>VALOR BRUTO</th>
+                          <th className="text-end">ACCIONES</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {trashedRecords.map(r => (
+                          <tr key={r.id}>
+                            <td className="fw-bold text-start">{r.paciente}</td>
+                            <td className="text-start">{r.fecha}</td>
+                            <td className="text-start">${Number(r.valorBruto).toLocaleString()}</td>
+                            <td className="text-end">
+                              <button onClick={() => restoreRecord(r.id)} title="Restaurar" className="btn btn-sm btn-outline-success rounded-circle me-2"><RotateCcw size={14}/></button>
+                              <button onClick={() => hardDelete(r.id)} title="Eliminar Permanente" className="btn btn-sm btn-outline-danger rounded-circle"><Trash2 size={14}/></button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
             </div>
           </div>
         )}
 
-        {/* HISTORIAL CON FILTROS */}
+        {/* HISTORIAL */}
         {view === 'history' && (
-          <div className="animate-fade">
+          <div className="animate-fade text-start">
             <div className="d-flex flex-column flex-lg-row justify-content-between align-items-start align-items-lg-center mb-4 gap-3">
               <h2 className="fw-bold text-contrast-fix m-0">Historial</h2>
               <div className="d-flex flex-wrap gap-2 w-100 w-lg-auto">
@@ -471,17 +608,17 @@ export default function App() {
                             <span className="badge bg-primary bg-opacity-10 text-primary py-2 px-3 fw-bold rounded-pill">{r.fecha}</span>
                             <span className="text-muted small">#{r.id.split('-')[1].slice(-4)}</span>
                           </div>
-                          <h5 className="fw-bold text-contrast-fix mb-1">{r.paciente}</h5>
-                          <p className="text-primary small mb-3 fw-bold">{r.tipoCx}</p>
+                          <h5 className="fw-bold text-contrast-fix mb-1 text-start">{r.paciente}</h5>
+                          <p className="text-primary small mb-3 fw-bold text-start">{r.tipoCx}</p>
                           <div className={`p-3 rounded-4 mb-3 ${darkMode ? 'bg-secondary bg-opacity-10' : 'bg-light'}`}>
-                            <div className="d-flex justify-content-between small"><span>Bruto:</span><span className="fw-bold text-contrast-fix">${f.bruto.toLocaleString()}</span></div>
-                            <div className="d-flex justify-content-between small text-success fw-bold mt-1"><span>Neto ({(100 - TAX_RATE*100).toFixed(2)}%):</span><span>${f.liquido.toLocaleString(undefined, {maximumFractionDigits:0})}</span></div>
+                            <div className="d-flex justify-content-between small text-start"><span>Bruto:</span><span className="fw-bold text-contrast-fix">${f.bruto.toLocaleString()}</span></div>
+                            <div className="d-flex justify-content-between small text-success fw-bold mt-1 text-start"><span>Neto ({(100 - TAX_RATE*100).toFixed(2)}%):</span><span>${f.liquido.toLocaleString(undefined, {maximumFractionDigits:0})}</span></div>
                           </div>
                           <div className="d-flex justify-content-between align-items-center">
-                            <span className="small text-muted-fix"><MapPin size={12} className="me-1"/>{r.institucion}</span>
+                            <span className="small text-muted-fix text-start"><MapPin size={12} className="me-1"/>{r.institucion}</span>
                             <div className="d-flex gap-1">
                               <button onClick={() => { setFormData(r); setEditingId(r.id); setView('form'); }} className="btn btn-sm btn-outline-primary rounded-circle p-2"><Edit3 size={16}/></button>
-                              <button onClick={() => { if(confirm('¿Eliminar registro?')) setRecords(records.filter(x => x.id !== r.id)) }} className="btn btn-sm btn-outline-danger rounded-circle p-2"><Trash2 size={16}/></button>
+                              <button onClick={() => softDelete(r.id)} className="btn btn-sm btn-outline-danger rounded-circle p-2"><Trash2 size={16}/></button>
                             </div>
                           </div>
                         </div>
@@ -520,7 +657,7 @@ export default function App() {
 
       <footer className={`py-4 mt-auto border-top ${darkMode ? 'bg-dark border-secondary' : 'bg-white border-light'}`}>
         <div className="container text-center">
-          <p className="small text-muted-fix mb-0 fw-bold opacity-75">SurgiTrack Pro Elite v9.1 • Dra. Maria Joaquina • Impuestos: {(TAX_RATE*100).toFixed(2)}%</p>
+          <p className="small text-muted-fix mb-0 fw-bold opacity-75">SurgiTrack Pro Elite v9.2 • Dra. Maria Joaquina • Impuestos: {(TAX_RATE*100).toFixed(2)}%</p>
         </div>
       </footer>
     </div>
