@@ -1,42 +1,114 @@
 #root {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
 }
 
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 300ms;
-}
-.logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
-}
-.logo.react:hover {
-  filter: drop-shadow(0 0 2em #61dafbaa);
+/* Bootstrap color overrides using CSS custom properties */
+.text-primary { color: var(--primary-color) !important; }
+.text-info { color: var(--accent-color) !important; }
+.text-success { color: var(--success-color) !important; }
+.text-warning { color: var(--warning-color) !important; }
+.text-danger { color: var(--danger-color) !important; }
+.text-secondary { color: var(--secondary-color) !important; }
+
+.bg-primary { background-color: var(--primary-color) !important; }
+.bg-info { background-color: var(--accent-color) !important; }
+.bg-success { background-color: var(--success-color) !important; }
+.bg-warning { background-color: var(--warning-color) !important; }
+.bg-danger { background-color: var(--danger-color) !important; }
+.bg-secondary { background-color: var(--secondary-color) !important; }
+
+.btn-primary {
+  background-color: var(--primary-color) !important;
+  border-color: var(--primary-color) !important;
+  color: #fff !important;
 }
 
-@keyframes logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+.btn-primary:hover,
+.btn-primary:focus,
+.btn-primary:active {
+  background-color: color-mix(in srgb, var(--primary-color) 85%, black) !important;
+  border-color: color-mix(in srgb, var(--primary-color) 80%, black) !important;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  a:nth-of-type(2) .logo {
-    animation: logo-spin infinite 20s linear;
-  }
+.btn-outline-primary {
+  color: var(--primary-color) !important;
+  border-color: var(--primary-color) !important;
 }
 
-.card {
-  padding: 2em;
+.btn-outline-primary:hover {
+  background-color: var(--primary-color) !important;
+  border-color: var(--primary-color) !important;
+  color: #fff !important;
 }
 
-.read-the-docs {
-  color: #888;
+.btn-outline-success {
+  color: var(--success-color) !important;
+  border-color: var(--success-color) !important;
 }
+
+.btn-outline-success:hover {
+  background-color: var(--success-color) !important;
+  border-color: var(--success-color) !important;
+  color: #fff !important;
+}
+
+.btn-outline-danger {
+  color: var(--danger-color) !important;
+  border-color: var(--danger-color) !important;
+}
+
+.btn-outline-danger:hover {
+  background-color: var(--danger-color) !important;
+  border-color: var(--danger-color) !important;
+  color: #fff !important;
+}
+
+.btn-outline-secondary {
+  color: var(--secondary-color) !important;
+  border-color: var(--secondary-color) !important;
+}
+
+.btn-outline-secondary:hover {
+  background-color: var(--secondary-color) !important;
+  border-color: var(--secondary-color) !important;
+  color: #fff !important;
+}
+
+.badge.bg-primary { background-color: var(--primary-color) !important; }
+.badge.bg-success { background-color: var(--success-color) !important; }
+.badge.bg-danger { background-color: var(--danger-color) !important; }
+.badge.bg-warning { background-color: var(--warning-color) !important; }
+.badge.bg-info { background-color: var(--accent-color) !important; }
+
+.badge.text-primary { color: var(--primary-color) !important; }
+.badge.text-success { color: var(--success-color) !important; }
+.badge.text-danger { color: var(--danger-color) !important; }
+.badge.text-info { color: var(--accent-color) !important; }
+
+.border-primary { border-color: var(--primary-color) !important; }
+.border-success { border-color: var(--success-color) !important; }
+.border-secondary { border-color: var(--border-secondary) !important; }
+
+.bg-primary.bg-opacity-10 { background-color: color-mix(in srgb, var(--primary-color) 10%, transparent) !important; }
+.bg-success.bg-opacity-10 { background-color: color-mix(in srgb, var(--success-color) 10%, transparent) !important; }
+.bg-danger.bg-opacity-10 { background-color: color-mix(in srgb, var(--danger-color) 10%, transparent) !important; }
+.bg-info.bg-opacity-10 { background-color: color-mix(in srgb, var(--accent-color) 10%, transparent) !important; }
+.bg-secondary.bg-opacity-10 { background-color: color-mix(in srgb, var(--secondary-color) 10%, transparent) !important; }
+.bg-warning.bg-opacity-10 { background-color: color-mix(in srgb, var(--warning-color) 10%, transparent) !important; }
+
+.bg-primary.bg-opacity-25 { background-color: color-mix(in srgb, var(--primary-color) 25%, transparent) !important; }
+.bg-success.bg-opacity-25 { background-color: color-mix(in srgb, var(--success-color) 25%, transparent) !important; }
+.bg-danger.bg-opacity-25 { background-color: color-mix(in srgb, var(--danger-color) 25%, transparent) !important; }
+.bg-info.bg-opacity-25 { background-color: color-mix(in srgb, var(--accent-color) 25%, transparent) !important; }
+.bg-secondary.bg-opacity-25 { background-color: color-mix(in srgb, var(--secondary-color) 25%, transparent) !important; }
+
+.text-primary.bg-opacity-10 { background-color: color-mix(in srgb, var(--primary-color) 10%, transparent) !important; }
+.text-success.bg-opacity-10 { background-color: color-mix(in srgb, var(--success-color) 10%, transparent) !important; }
+.text-danger.bg-opacity-10 { background-color: color-mix(in srgb, var(--danger-color) 10%, transparent) !important; }
+
+.border-success.border-opacity-10 { border-color: color-mix(in srgb, var(--success-color) 10%, transparent) !important; }
+.border-success.border-opacity-25 { border-color: color-mix(in srgb, var(--success-color) 25%, transparent) !important; }
+.border-primary.border-opacity-50 { border-color: color-mix(in srgb, var(--primary-color) 50%, transparent) !important; }

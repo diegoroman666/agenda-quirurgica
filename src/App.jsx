@@ -22,16 +22,94 @@ import {
   Filter,
   ArrowRight,
   Receipt,
-  RotateCcw
+  RotateCcw,
+  Settings,
+  Palette
 } from 'lucide-react';
+import './App.css';
 
 const XLSX_SCRIPT_URL = "https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js";
 const JSPDF_SCRIPT_URL = "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js";
-const TAX_RATE = 0.1525; // 15.25%
+const TAX_RATE = 0.1525;
 
-const Navbar = ({ view, setView, darkMode, setDarkMode }) => (
-  <nav className={`navbar sticky-top border-bottom px-2 py-2 px-md-3 py-md-3 ${darkMode ? 'navbar-dark bg-dark border-secondary' : 'navbar-light bg-white border-light'}`} 
-       style={{ backdropFilter: 'blur(20px)', backgroundColor: darkMode ? '#0f0f14' : '#ffffff', zIndex: 1050 }}>
+const DEFAULT_COLORS = {
+  primary: '#0d6efd',
+  secondary: '#6c757d',
+  accent: '#17a2b8',
+  success: '#28a745'
+};
+
+const COLOR_LABELS = {
+  primary: 'Primario',
+  secondary: 'Secundario',
+  accent: 'Acento',
+  success: 'Éxito'
+};
+
+const SettingsPanel = ({ show, onClose, colors, setColors }) => {
+  const handleColorChange = (key, value) => {
+    const newColors = { ...colors, [key]: value };
+    setColors(newColors);
+    document.documentElement.style.setProperty(`--${key}-color`, value);
+  };
+
+  const resetColors = () => {
+    setColors(DEFAULT_COLORS);
+    Object.entries(DEFAULT_COLORS).forEach(([key, value]) => {
+      document.documentElement.style.setProperty(`--${key}-color`, value);
+    });
+  };
+
+  return (
+    <>
+      {show && <div className="settings-backdrop" onClick={onClose} />}
+      <div className={`settings-drawer ${show ? 'open' : ''}`}>
+        <div className="d-flex justify-content-between align-items-center mb-1">
+          <h3 className="fw-bold m-0"><Palette size={20} className="me-2" />Personalizar</h3>
+          <button onClick={onClose} className="btn btn-sm p-1 border-0" style={{ color: 'var(--text-muted)' }}>
+            <X size={22} />
+          </button>
+        </div>
+        <p className="settings-subtitle">Ajusta la paleta de colores de la aplicación</p>
+
+        <div className="color-preview-row">
+          {Object.values(colors).map((c, i) => (
+            <div key={i} className="color-preview-swatch" style={{ backgroundColor: c }} />
+          ))}
+        </div>
+
+        <div className="settings-section-title">Colores principales</div>
+
+        {Object.entries(colors).map(([key, value]) => (
+          <div className="color-picker-group" key={key}>
+            <label>{COLOR_LABELS[key]}</label>
+            <div className="color-picker-row">
+              <input
+                type="color"
+                value={value}
+                onChange={e => handleColorChange(key, e.target.value)}
+              />
+              <span className="hex-value">{value.toUpperCase()}</span>
+            </div>
+          </div>
+        ))}
+
+        <hr className="settings-divider" />
+
+        <button
+          onClick={resetColors}
+          className="btn btn-outline-secondary w-100 rounded-pill fw-bold py-2"
+        >
+          <RotateCcw size={16} className="me-2" />Restaurar valores predeterminados
+        </button>
+      </div>
+    </>
+  );
+};
+
+const Navbar = ({ view, setView, darkMode, setDarkMode, onOpenSettings }) => (
+  <nav className="navbar sticky-top border-bottom px-2 py-2 px-md-3 py-md-3 navbar-dark" 
+       style={{ backdropFilter: 'blur(20px)', backgroundColor: 'var(--navbar-bg)', borderColor: 'var(--navbar-border)', zIndex: 1050 }}>
     <div className="container-fluid flex-nowrap">
       <div className="d-flex align-items-center gap-2 gap-md-3" onClick={() => setView('home')} style={{ cursor: 'pointer' }}>
         <div className="bg-primary bg-gradient p-2 rounded-4 shadow-sm">
@@ -39,7 +117,7 @@ const Navbar = ({ view, setView, darkMode, setDarkMode }) => (
         </div>
         <div className="d-flex flex-column d-none d-sm-flex">
           <span className="fw-bold h6 mb-0 text-primary" style={{ letterSpacing: '-0.5px' }}>SurgiTrack <span className="text-info">Pro</span></span>
-          <small className={`fw-bold text-uppercase ${darkMode ? 'text-light' : 'text-dark'}`} style={{ fontSize: '8px', opacity: 0.8 }}>Dra. Maria Joaquina</small>
+          <small className="fw-bold text-uppercase" style={{ fontSize: '8px', opacity: 0.8, color: 'var(--text-contrast)' }}>Dra. Maria Joaquina</small>
         </div>
       </div>
 
@@ -48,18 +126,22 @@ const Navbar = ({ view, setView, darkMode, setDarkMode }) => (
           <PlusCircle size={18} /> <span className="d-none d-md-inline">Nueva Cx</span>
         </button>
         
-        <div className={`d-flex p-1 rounded-4 border ${darkMode ? 'bg-secondary bg-opacity-25 border-secondary' : 'bg-light border-light'}`}>
-          <button onClick={() => setView('dashboard')} className={`btn btn-sm px-2 px-md-3 rounded-pill fw-bold ${view === 'dashboard' ? 'btn-primary shadow-sm text-white' : 'border-0 text-secondary'}`}>
+        <div className="d-flex p-1 rounded-4 border" style={{ backgroundColor: darkMode ? 'rgba(108,117,125,0.15)' : 'rgba(248,249,250,1)', borderColor: 'var(--border-secondary)' }}>
+          <button onClick={() => setView('dashboard')} className={`btn btn-sm px-2 px-md-3 rounded-pill fw-bold ${view === 'dashboard' ? 'btn-primary shadow-sm text-white' : 'border-0'}`} style={{ color: view !== 'dashboard' ? 'var(--text-muted)' : undefined }}>
             <TrendingUp size={16} className="d-md-none"/> <span className="d-none d-md-inline">Análisis</span>
           </button>
-          <button onClick={() => setView('calendar')} className={`btn btn-sm px-2 px-md-3 rounded-pill fw-bold ${view === 'calendar' ? 'btn-primary shadow-sm text-white' : 'border-0 text-secondary'}`}>
+          <button onClick={() => setView('calendar')} className={`btn btn-sm px-2 px-md-3 rounded-pill fw-bold ${view === 'calendar' ? 'btn-primary shadow-sm text-white' : 'border-0'}`} style={{ color: view !== 'calendar' ? 'var(--text-muted)' : undefined }}>
             <CalendarIcon size={16} className="d-md-none"/> <span className="d-none d-md-inline">Agenda</span>
           </button>
-          <button onClick={() => setView('history')} className={`btn btn-sm px-2 px-md-3 rounded-pill fw-bold ${view === 'history' ? 'btn-primary shadow-sm text-white' : 'border-0 text-secondary'}`}>
+          <button onClick={() => setView('history')} className={`btn btn-sm px-2 px-md-3 rounded-pill fw-bold ${view === 'history' ? 'btn-primary shadow-sm text-white' : 'border-0'}`} style={{ color: view !== 'history' ? 'var(--text-muted)' : undefined }}>
             <ClipboardList size={16} className="d-md-none"/> <span className="d-none d-md-inline">Registros</span>
           </button>
         </div>
         
+        <button onClick={onOpenSettings} className="btn border-0 p-2 rounded-circle" style={{ color: 'var(--text-muted)' }} title="Personalizar colores">
+          <Settings size={20} />
+        </button>
+
         <button onClick={() => setDarkMode(!darkMode)} className={`btn border-0 p-2 rounded-circle ${darkMode ? 'text-warning' : 'text-secondary'}`}>
           {darkMode ? <Sun size={20} /> : <Moon size={20} />}
         </button>
@@ -69,7 +151,21 @@ const Navbar = ({ view, setView, darkMode, setDarkMode }) => (
 );
 
 export default function App() {
-  const [darkMode, setDarkMode] = useState(true);
+  const [darkMode, setDarkMode] = useState(() => {
+    const saved = localStorage.getItem('surgitrack-dark');
+    if (saved !== null) return saved === 'true';
+    return window.matchMedia('(prefers-color-scheme: dark)').matches;
+  });
+
+  const [colors, setColors] = useState(() => {
+    const saved = localStorage.getItem('surgitrack-colors');
+    if (saved) {
+      try { return { ...DEFAULT_COLORS, ...JSON.parse(saved) }; } catch { return { ...DEFAULT_COLORS }; }
+    }
+    return { ...DEFAULT_COLORS };
+  });
+
+  const [showSettings, setShowSettings] = useState(false);
   const [view, setView] = useState('home'); 
   const [editingId, setEditingId] = useState(null);
   
@@ -88,6 +184,18 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('mj_surgical_v9_2', JSON.stringify(records));
   }, [records]);
+
+  useEffect(() => {
+    localStorage.setItem('surgitrack-dark', String(darkMode));
+    document.documentElement.setAttribute('data-theme', darkMode ? 'dark' : 'light');
+  }, [darkMode]);
+
+  useEffect(() => {
+    localStorage.setItem('surgitrack-colors', JSON.stringify(colors));
+    Object.entries(colors).forEach(([key, value]) => {
+      document.documentElement.style.setProperty(`--${key}-color`, value);
+    });
+  }, [colors]);
 
   useEffect(() => {
     const scripts = [XLSX_SCRIPT_URL, JSPDF_SCRIPT_URL];
@@ -136,13 +244,13 @@ export default function App() {
       const f = calculateFinance(r.valorBruto);
       return {
         "ID Registro": r.id, "Fecha": r.fecha, "Hora": r.hora, "Paciente": r.paciente,
-        "Procedimiento": r.tipoCx, "Institución": r.institucion, "Monto Bruto ($)": f.bruto,
-        "Retención 15.25% ($)": f.retencion, "Monto Neto ($)": f.liquido
+        "Procedimiento": r.tipoCx, "Institucion": r.institucion, "Monto Bruto ($)": f.bruto,
+        "Retencion 15.25% ($)": f.retencion, "Monto Neto ($)": f.liquido
       };
     });
     const worksheet = window.XLSX.utils.json_to_sheet(worksheetData);
     const workbook = window.XLSX.utils.book_new();
-    window.XLSX.utils.book_append_sheet(workbook, worksheet, "Cirugías");
+    window.XLSX.utils.book_append_sheet(workbook, worksheet, "Cirugias");
     window.XLSX.writeFile(workbook, `${filename}.xlsx`);
   };
 
@@ -172,15 +280,15 @@ export default function App() {
     doc.text(`Total de Procedimientos: ${stats.count}`, 30, 75);
     doc.text(`Total Ingresos Brutos: $${stats.bruto.toLocaleString()}`, 30, 85);
     doc.setTextColor(220, 53, 69);
-    doc.text(`Retención de Impuestos (${(TAX_RATE * 100).toFixed(2)}%): -$${stats.retencion.toLocaleString(undefined, {maximumFractionDigits: 0})}`, 30, 95);
+    doc.text(`Retencion de Impuestos (${(TAX_RATE * 100).toFixed(2)}%): -$${stats.retencion.toLocaleString(undefined, {maximumFractionDigits: 0})}`, 30, 95);
     
     doc.setFontSize(16);
     doc.setTextColor(25, 135, 84);
-    doc.text(`TOTAL LÍQUIDO PERCIBIDO: $${stats.liquido.toLocaleString(undefined, {maximumFractionDigits: 0})}`, 20, 115);
+    doc.text(`TOTAL LIQUIDO PERCIBIDO: $${stats.liquido.toLocaleString(undefined, {maximumFractionDigits: 0})}`, 20, 115);
 
     doc.setFontSize(10);
     doc.setTextColor(150);
-    doc.text("Generado automáticamente por SurgiTrack Pro Elite v9.2", 20, 280);
+    doc.text("Generado automaticamente por SurgiTrack Pro Elite v9.2", 20, 280);
 
     doc.save(`Reporte_Financiero_${mes.replace(' ', '_')}.pdf`);
   };
@@ -239,7 +347,7 @@ export default function App() {
   };
 
   const hardDelete = (id) => {
-    if(confirm('¿Eliminar definitivamente de la papelera?')) {
+    if(confirm('Eliminar definitivamente de la papelera?')) {
       setRecords(prev => prev.filter(r => r.id !== id));
     }
   };
@@ -267,37 +375,37 @@ export default function App() {
   }, [selectedDayRecords]);
 
   return (
-    <div className={`min-vh-100 d-flex flex-column ${darkMode ? 'bg-dark text-white' : 'bg-light text-dark'}`} style={{ width: '100vw', overflowX: 'hidden' }}>
+    <div className="min-vh-100 d-flex flex-column" style={{ width: '100vw', overflowX: 'hidden', backgroundColor: 'var(--bg-primary)', color: 'var(--text-contrast)' }}>
       <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" />
       <style>{`
-        body { font-family: 'Inter', sans-serif; background: ${darkMode ? '#0a0a0c' : '#f9fafb'}; }
-        .text-contrast-fix { color: ${darkMode ? '#FFFFFF !important' : '#111827 !important'}; }
-        .text-muted-fix { color: ${darkMode ? '#A1A1AA !important' : '#4B5563 !important'}; }
+        body { font-family: 'Inter', sans-serif; background: var(--bg-primary); color: var(--text-contrast); }
+        .text-contrast-fix { color: var(--text-contrast) !important; }
+        .text-muted-fix { color: var(--text-muted) !important; }
         
         .form-control, .form-select {
-          background-color: ${darkMode ? '#1a1a20' : '#ffffff'} !important;
-          color: ${darkMode ? '#ffffff' : '#000000'} !important;
-          border: 1px solid ${darkMode ? '#3f3f46' : '#d1d5db'} !important;
+          background-color: var(--bg-input) !important;
+          color: var(--text-contrast) !important;
+          border: 1px solid var(--border-input) !important;
           padding: 12px 16px;
           border-radius: 12px;
         }
 
         .glass-card { 
-          background: ${darkMode ? 'rgba(30, 30, 35, 0.95)' : 'rgba(255, 255, 255, 0.95)'}; 
+          background: var(--bg-card); 
           backdrop-filter: blur(10px); 
-          border: 1px solid ${darkMode ? '#333' : '#eee'};
+          border: 1px solid var(--border-color);
           border-radius: 24px;
+          box-shadow: var(--shadow-glass);
         }
 
         .calendar-cell { 
           min-height: 100px; 
           border-radius: 12px; 
           transition: 0.2s; 
-          border: 1px solid ${darkMode ? '#222' : '#eee'}; 
+          border: 1px solid var(--border-color); 
           padding: 8px;
         }
 
-        /* METODO FORZADO PARA BOTON CIRCULAR PERFECTO */
         .btn-circular-add {
           width: 26px !important;
           height: 26px !important;
@@ -311,7 +419,7 @@ export default function App() {
           align-items: center !important;
           justify-content: center !important;
           border: none !important;
-          background-color: #0d6efd !important;
+          background-color: var(--primary-color) !important;
           color: #ffffff !important;
           cursor: pointer !important;
           transition: transform 0.2s, background-color 0.2s;
@@ -320,28 +428,36 @@ export default function App() {
         }
         
         .btn-circular-add:hover {
-          background-color: #0b5ed7 !important;
+          background-color: color-mix(in srgb, var(--primary-color) 85%, black) !important;
           transform: scale(1.1);
         }
 
         .btn-plus-float {
           position: fixed; bottom: 30px; right: 30px; width: 60px; height: 60px; border-radius: 50%;
           z-index: 1000; display: flex; align-items: center; justify-content: center;
-          box-shadow: 0 10px 25px rgba(13, 110, 253, 0.4); transition: 0.3s;
+          box-shadow: 0 10px 25px color-mix(in srgb, var(--primary-color) 40%, transparent);
+          transition: 0.3s;
           color: #ffffff !important;
+        }
+
+        .btn-plus-float:hover {
+          transform: scale(1.1);
+          box-shadow: 0 14px 32px color-mix(in srgb, var(--primary-color) 50%, transparent);
         }
         
         .btn-nav-cal {
-           background-color: ${darkMode ? '#2a2a35' : '#f8f9fa'};
-           color: ${darkMode ? '#ffffff' : '#333333'};
-           border: 1px solid ${darkMode ? '#3f3f46' : '#dee2e6'};
+           background-color: var(--btn-nav-cal-bg);
+           color: var(--btn-nav-cal-text);
+           border: 1px solid var(--border-input);
         }
 
         .animate-fade { animation: fadeIn 0.3s ease forwards; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
       `}</style>
 
-      <Navbar view={view} setView={setView} darkMode={darkMode} setDarkMode={setDarkMode} />
+      <Navbar view={view} setView={setView} darkMode={darkMode} setDarkMode={setDarkMode} onOpenSettings={() => setShowSettings(true)} />
+
+      <SettingsPanel show={showSettings} onClose={() => setShowSettings(false)} colors={colors} setColors={setColors} />
 
       <button onClick={() => { setEditingId(null); setFormData(initialForm); setView('form'); }} className="btn btn-primary btn-plus-float">
         <Plus size={32} strokeWidth={3} />
@@ -349,16 +465,15 @@ export default function App() {
 
       <main className="container-fluid px-3 px-md-5 py-4 flex-grow-1">
         
-        {/* FORMULARIO */}
         {view === 'form' && (
           <div className="d-flex justify-content-center animate-fade py-2">
-            <div className={`card glass-card p-4 p-md-5 w-100 shadow-lg`} style={{ maxWidth: '700px' }}>
+            <div className="card glass-card p-4 p-md-5 w-100 shadow-lg" style={{ maxWidth: '700px' }}>
               <div className="d-flex justify-content-between align-items-start mb-4">
                 <div className="text-start">
-                  <h2 className="fw-bold text-contrast-fix m-0">{editingId ? 'Editar Cirugía' : 'Nuevo Registro'}</h2>
-                  <p className="text-muted-fix small">Retención Automática del {(TAX_RATE*100).toFixed(2)}%</p>
+                  <h2 className="fw-bold text-contrast-fix m-0">{editingId ? 'Editar Cirugia' : 'Nuevo Registro'}</h2>
+                  <p className="text-muted-fix small">Retencion Automatica del {(TAX_RATE*100).toFixed(2)}%</p>
                 </div>
-                <button onClick={() => setView('calendar')} className={`btn rounded-circle p-2 border-0 ${darkMode ? 'text-light' : 'text-dark'}`}><X size={24} /></button>
+                <button onClick={() => setView('calendar')} className="btn rounded-circle p-2 border-0" style={{ color: 'var(--text-contrast)' }}><X size={24} /></button>
               </div>
 
               <form onSubmit={handleSubmit} className="row g-3 text-start">
@@ -368,10 +483,10 @@ export default function App() {
                   <input type="time" className="form-control" value={formData.hora} onChange={e => setFormData({...formData, hora: e.target.value})} required /></div>
                 <div className="col-12"><label className="form-label fw-bold text-contrast-fix small">PACIENTE</label>
                   <input type="text" className="form-control" placeholder="Nombre completo" value={formData.paciente} onChange={e => setFormData({...formData, paciente: e.target.value})} required /></div>
-                <div className="col-12"><label className="form-label fw-bold text-contrast-fix small">CIRUGÍA / PROCEDIMIENTO</label>
-                  <input type="text" className="form-control" placeholder="Tipo de cirugía" value={formData.tipoCx} onChange={e => setFormData({...formData, tipoCx: e.target.value})} required /></div>
-                <div className="col-12"><label className="form-label fw-bold text-contrast-fix small">INSTITUCIÓN</label>
-                  <input type="text" className="form-control" placeholder="Clínica o Hospital" value={formData.institucion} onChange={e => setFormData({...formData, institucion: e.target.value})} required /></div>
+                <div className="col-12"><label className="form-label fw-bold text-contrast-fix small">CIRUGIA / PROCEDIMIENTO</label>
+                  <input type="text" className="form-control" placeholder="Tipo de cirugia" value={formData.tipoCx} onChange={e => setFormData({...formData, tipoCx: e.target.value})} required /></div>
+                <div className="col-12"><label className="form-label fw-bold text-contrast-fix small">INSTITUCION</label>
+                  <input type="text" className="form-control" placeholder="Clinica o Hospital" value={formData.institucion} onChange={e => setFormData({...formData, institucion: e.target.value})} required /></div>
                 <div className="col-12"><label className="form-label fw-bold text-contrast-fix small">HONORARIOS BRUTOS ($)</label>
                   <input type="number" className="form-control fw-bold text-primary h4 py-3" value={formData.valorBruto} onChange={e => setFormData({...formData, valorBruto: e.target.value})} required /></div>
                 <div className="col-12 mt-4"><button type="submit" className="btn btn-primary w-100 p-3 rounded-pill fw-bold shadow-sm">{editingId ? 'Guardar Cambios' : 'Confirmar Registro'}</button></div>
@@ -380,12 +495,11 @@ export default function App() {
           </div>
         )}
 
-        {/* CALENDARIO */}
         {view === 'calendar' && (
           <div className="animate-fade">
             <div className="d-flex flex-column flex-md-row justify-content-between align-items-center mb-4 gap-3">
-              <h2 className="fw-bold m-0 text-contrast-fix">Agenda Quirúrgica</h2>
-              <div className={`d-flex align-items-center rounded-pill p-1 ${darkMode ? 'bg-secondary bg-opacity-25' : 'bg-light'}`}>
+              <h2 className="fw-bold m-0 text-contrast-fix">Agenda Quirurgica</h2>
+              <div className="d-flex align-items-center rounded-pill p-1" style={{ backgroundColor: darkMode ? 'rgba(108,117,125,0.15)' : 'var(--bg-card-alt)' }}>
                 <button onClick={() => setCurrentCalDate(new Date(currentCalDate.getFullYear(), currentCalDate.getMonth() - 1, 1))} className="btn btn-sm btn-nav-cal rounded-circle"><ChevronLeft size={16}/></button>
                 <span className="px-3 fw-bold text-uppercase small text-contrast-fix" style={{ minWidth: '160px', textAlign: 'center' }}>
                   {currentCalDate.toLocaleString('es-ES', { month: 'long', year: 'numeric' })}
@@ -399,12 +513,11 @@ export default function App() {
                 <div className="calendar-grid d-grid" style={{ gridTemplateColumns: 'repeat(7, 1fr)', gap: '8px' }}>
                   {['Dom', 'Lun', 'Mar', 'Mie', 'Jue', 'Vie', 'Sab'].map(d => ( <div key={d} className="text-center fw-bold text-muted small py-2">{d}</div> ))}
                   {calendarDays.map((d, i) => (
-                    <div key={i} className={`calendar-cell ${d.day ? (darkMode ? 'bg-dark' : 'bg-white') : 'bg-transparent border-0'} ${d.records?.length > 0 ? 'border-primary border-opacity-50 shadow-sm' : ''}`} style={d.records?.length > 0 ? {backgroundColor: darkMode ? '#1e293b' : '#f0f7ff'} : {}}>
+                    <div key={i} className={`calendar-cell ${d.day ? (darkMode ? 'bg-dark' : 'bg-white') : 'bg-transparent border-0'} ${d.records?.length > 0 ? 'border-primary border-opacity-50 shadow-sm' : ''}`} style={d.records?.length > 0 ? {backgroundColor: 'var(--bg-calendar-event)'} : {}}>
                       {d.day && (
                         <>
                           <div className="d-flex justify-content-between align-items-start mb-2">
                             <span className={`fw-bold small ${d.records?.length > 0 ? 'text-primary' : 'text-contrast-fix'}`}>{d.day}</span>
-                            {/* BOTON CORREGIDO INTEGRADO EN EL FLEXBOX SUPERIOR */}
                             <button 
                               type="button"
                               onClick={(e) => { e.stopPropagation(); openFormWithDate(d.date); }} 
@@ -431,12 +544,12 @@ export default function App() {
                   <div className={`card glass-card h-100 shadow-lg ${darkMode ? 'border-secondary' : ''}`}>
                     <div className="card-body p-4 text-start">
                       <div className="d-flex justify-content-between mb-3">
-                        <h4 className="fw-bold text-contrast-fix m-0">Día {selectedDayRecords.date.split('-').reverse().join('/')}</h4>
+                        <h4 className="fw-bold text-contrast-fix m-0">Dia {selectedDayRecords.date.split('-').reverse().join('/')}</h4>
                         <button className={`btn-close ${darkMode ? 'btn-close-white' : ''}`} onClick={() => setSelectedDayRecords(null)}></button>
                       </div>
 
-                      {selectedDayFinance.bruto > 0 && (
-                        <div className={`p-3 rounded-4 mb-4 border ${darkMode ? 'bg-success bg-opacity-10 border-success border-opacity-25' : 'bg-success bg-opacity-10 border-success border-opacity-10'}`}>
+                      {selectedDayFinance && selectedDayFinance.bruto > 0 && (
+                        <div className="p-3 rounded-4 mb-4 border" style={{ backgroundColor: 'color-mix(in srgb, var(--success-color) 10%, transparent)', borderColor: 'color-mix(in srgb, var(--success-color) 25%, transparent)' }}>
                            <div className="d-flex align-items-center gap-2 mb-2">
                              <Receipt size={18} className="text-success"/>
                              <span className="fw-bold text-success small">Resumen Diario</span>
@@ -446,22 +559,22 @@ export default function App() {
                              <span className="fw-bold text-contrast-fix">${selectedDayFinance.bruto.toLocaleString()}</span>
                            </div>
                            <div className="d-flex justify-content-between small mb-1">
-                             <span className="text-muted-fix">Retención ({(TAX_RATE*100).toFixed(2)}%):</span>
+                             <span className="text-muted-fix">Retencion ({(TAX_RATE*100).toFixed(2)}%):</span>
                              <span className="fw-bold text-danger">-${selectedDayFinance.retencion.toLocaleString(undefined, {maximumFractionDigits: 0})}</span>
                            </div>
                            <hr className="my-2 opacity-10" />
                            <div className="d-flex justify-content-between align-items-center">
-                             <span className="fw-bold text-success small">LÍQUIDO:</span>
+                             <span className="fw-bold text-success small">LIQUIDO:</span>
                              <span className="h5 fw-bold text-success m-0">${selectedDayFinance.liquido.toLocaleString(undefined, {maximumFractionDigits: 0})}</span>
                            </div>
                         </div>
                       )}
 
-                      <button onClick={() => openFormWithDate(selectedDayRecords.date)} className="btn btn-primary w-100 mb-4 rounded-pill fw-bold"><Plus size={18} className="me-2"/> Nueva en este día</button>
+                      <button onClick={() => openFormWithDate(selectedDayRecords.date)} className="btn btn-primary w-100 mb-4 rounded-pill fw-bold"><Plus size={18} className="me-2"/> Nueva en este dia</button>
                       
                       <div className="records-list" style={{ maxHeight: '400px', overflowY: 'auto' }}>
                         {selectedDayRecords.records.length === 0 ? (
-                          <p className="text-center text-muted small py-4">No hay cirugías programadas</p>
+                          <p className="text-center text-muted small py-4">No hay cirugias programadas</p>
                         ) : (
                           selectedDayRecords.records.map((r, idx) => (
                             <div key={idx} className="border-bottom border-secondary border-opacity-10 pb-3 mb-3 last-child-border-0">
@@ -483,18 +596,17 @@ export default function App() {
           </div>
         )}
 
-        {/* ANÁLISIS */}
         {view === 'dashboard' && (
           <div className="animate-fade text-start">
             <div className="d-flex flex-column flex-md-row justify-content-between align-items-center mb-4 gap-3">
-              <h2 className="fw-bold text-contrast-fix m-0">Análisis Financiero</h2>
+              <h2 className="fw-bold text-contrast-fix m-0">Analisis Financiero</h2>
               <div className="d-flex gap-2">
-                <select className={`form-select form-select-sm rounded-pill px-3 fw-bold ${darkMode ? 'bg-nav-cal' : ''}`} 
+                <select className="form-select form-select-sm rounded-pill px-3 fw-bold"
                         value={selectedAnalysisDate.getMonth()} 
                         onChange={e => setSelectedAnalysisDate(new Date(selectedAnalysisDate.getFullYear(), parseInt(e.target.value), 1))}>
                   {['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'].map((m, i) => <option key={i} value={i}>{m}</option>)}
                 </select>
-                <select className={`form-select form-select-sm rounded-pill px-3 fw-bold ${darkMode ? 'bg-nav-cal' : ''}`} 
+                <select className="form-select form-select-sm rounded-pill px-3 fw-bold"
                         value={selectedAnalysisDate.getFullYear()} 
                         onChange={e => setSelectedAnalysisDate(new Date(parseInt(e.target.value), selectedAnalysisDate.getMonth(), 1))}>
                   {[...Array(10)].map((_, i) => { const y = new Date().getFullYear() - 5 + i; return <option key={y} value={y}>{y}</option>; })}
@@ -502,19 +614,19 @@ export default function App() {
               </div>
             </div>
 
-            <div className={`glass-card p-4 p-md-5 shadow-lg mb-4`}>
+            <div className="glass-card p-4 p-md-5 shadow-lg mb-4">
               <div className="row align-items-center">
                 <div className="col-lg-7">
                   <h4 className="text-primary fw-bold mb-4"><PieChart size={24} className="me-2"/> Resumen de {selectedAnalysisDate.toLocaleString('es-ES', { month: 'long', year: 'numeric' })}</h4>
                   <div className="row g-3">
-                    <div className="col-6"><div className="p-4 rounded-4 bg-secondary bg-opacity-10"><span className="d-block text-muted-fix small fw-bold mb-1">CIRUGÍAS</span><span className="h3 fw-bold text-contrast-fix">{statsPeriodo.count}</span></div></div>
-                    <div className="col-6"><div className="p-4 rounded-4 bg-primary bg-opacity-10"><span className="d-block text-muted-fix small fw-bold mb-1">TOTAL BRUTO</span><span className="h3 fw-bold text-contrast-fix">${statsPeriodo.bruto.toLocaleString()}</span></div></div>
+                    <div className="col-6"><div className="p-4 rounded-4" style={{ backgroundColor: 'color-mix(in srgb, var(--secondary-color) 10%, transparent)' }}><span className="d-block text-muted-fix small fw-bold mb-1">CIRUGIAS</span><span className="h3 fw-bold text-contrast-fix">{statsPeriodo.count}</span></div></div>
+                    <div className="col-6"><div className="p-4 rounded-4" style={{ backgroundColor: 'color-mix(in srgb, var(--primary-color) 10%, transparent)' }}><span className="d-block text-muted-fix small fw-bold mb-1">TOTAL BRUTO</span><span className="h3 fw-bold text-contrast-fix">${statsPeriodo.bruto.toLocaleString()}</span></div></div>
                   </div>
                 </div>
                 <div className="col-lg-5 text-lg-end mt-4 mt-lg-0 border-lg-start ps-lg-5">
                   <span className="text-muted-fix fw-bold small">MONTO NETO LIQUIDO</span>
                   <h2 className="display-5 fw-bold text-success mt-2">${statsPeriodo.liquido.toLocaleString(undefined, {maximumFractionDigits: 0})}</h2>
-                  <div className="badge bg-danger bg-opacity-10 text-danger p-2 px-3 rounded-pill fw-bold">Retención Automática ({(TAX_RATE*100).toFixed(2)}%): -${statsPeriodo.retencion.toLocaleString(undefined, {maximumFractionDigits: 0})}</div>
+                  <div className="badge bg-danger bg-opacity-10 text-danger p-2 px-3 rounded-pill fw-bold">Retencion Automatica ({(TAX_RATE*100).toFixed(2)}%): -${statsPeriodo.retencion.toLocaleString(undefined, {maximumFractionDigits: 0})}</div>
                   
                   <div className="d-flex gap-2 mt-4">
                     <button onClick={() => exportToExcel(statsPeriodo.filteredRecords, `Reporte_${selectedAnalysisDate.getMonth()+1}_${selectedAnalysisDate.getFullYear()}`)} className="btn btn-outline-success btn-sm flex-grow-1 rounded-pill fw-bold"><FileSpreadsheet size={16} className="me-1"/> Excel</button>
@@ -524,7 +636,6 @@ export default function App() {
               </div>
             </div>
 
-            {/* PAPELERA */}
             <div className="mt-5">
               <div className="d-flex align-items-center gap-2 mb-3">
                 <Trash2 className="text-danger" size={20}/>
@@ -532,7 +643,7 @@ export default function App() {
               </div>
               <div className="glass-card p-3 p-md-4 shadow-sm">
                 {trashedRecords.length === 0 ? (
-                   <p className="text-muted small m-0 text-center py-3">La papelera está vacía.</p>
+                   <p className="text-muted small m-0 text-center py-3">La papelera esta vacia.</p>
                 ) : (
                   <div className="table-responsive">
                     <table className={`table ${darkMode ? 'table-dark' : 'table-light'} table-hover align-middle mb-0`}>
@@ -565,28 +676,27 @@ export default function App() {
           </div>
         )}
 
-        {/* HISTORIAL */}
         {view === 'history' && (
           <div className="animate-fade text-start">
             <div className="d-flex flex-column flex-lg-row justify-content-between align-items-start align-items-lg-center mb-4 gap-3">
               <h2 className="fw-bold text-contrast-fix m-0">Historial</h2>
               <div className="d-flex flex-wrap gap-2 w-100 w-lg-auto">
                 <div className="position-relative flex-grow-1" style={{ minWidth: '250px' }}>
-                  <Search className="position-absolute top-50 start-0 translate-middle-y ms-3 text-muted" size={18} />
-                  <input type="text" className="form-control ps-5 rounded-pill" placeholder="Buscar por paciente, clínica..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+                  <Search className="position-absolute top-50 start-0 translate-middle-y ms-3" style={{ color: 'var(--text-muted)' }} size={18} />
+                  <input type="text" className="form-control ps-5 rounded-pill" placeholder="Buscar por paciente, clinica..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
                 </div>
-                <button onClick={() => { setSearchTerm(''); setDateRange({start:'', end:''}) }} className={`btn rounded-pill fw-bold ${darkMode ? 'btn-outline-secondary' : 'btn-light border'}`}>Limpiar</button>
+                <button onClick={() => { setSearchTerm(''); setDateRange({start:'', end:''}) }} className="btn rounded-pill fw-bold" style={{ backgroundColor: darkMode ? 'transparent' : 'var(--bg-card)', color: 'var(--text-muted)', borderColor: 'var(--border-color)', borderWidth: '1px', borderStyle: 'solid' }}>Limpiar</button>
               </div>
             </div>
 
-            <div className={`glass-card p-3 mb-4 shadow-sm border-0 d-flex flex-wrap align-items-center gap-3 ${darkMode ? 'bg-secondary bg-opacity-10' : 'bg-white'}`}>
+            <div className="glass-card p-3 mb-4 shadow-sm border-0 d-flex flex-wrap align-items-center gap-3" style={{ backgroundColor: darkMode ? 'rgba(108,117,125,0.1)' : 'var(--bg-card)' }}>
               <div className="d-flex align-items-center gap-2">
                 <Filter size={16} className="text-primary"/>
                 <span className="small fw-bold text-muted-fix">RANGO DE FECHAS:</span>
               </div>
               <div className="d-flex align-items-center gap-2">
                 <input type="date" className="form-control form-control-sm rounded-pill" value={dateRange.start} onChange={e => setDateRange({...dateRange, start: e.target.value})} />
-                <ArrowRight size={14} className="text-muted" />
+                <ArrowRight size={14} style={{ color: 'var(--text-muted)' }} />
                 <input type="date" className="form-control form-control-sm rounded-pill" value={dateRange.end} onChange={e => setDateRange({...dateRange, end: e.target.value})} />
               </div>
               <div className="ms-auto">
@@ -610,7 +720,7 @@ export default function App() {
                           </div>
                           <h5 className="fw-bold text-contrast-fix mb-1 text-start">{r.paciente}</h5>
                           <p className="text-primary small mb-3 fw-bold text-start">{r.tipoCx}</p>
-                          <div className={`p-3 rounded-4 mb-3 ${darkMode ? 'bg-secondary bg-opacity-10' : 'bg-light'}`}>
+                          <div className="p-3 rounded-4 mb-3" style={{ backgroundColor: darkMode ? 'rgba(108,117,125,0.1)' : 'var(--bg-card-alt)' }}>
                             <div className="d-flex justify-content-between small text-start"><span>Bruto:</span><span className="fw-bold text-contrast-fix">${f.bruto.toLocaleString()}</span></div>
                             <div className="d-flex justify-content-between small text-success fw-bold mt-1 text-start"><span>Neto ({(100 - TAX_RATE*100).toFixed(2)}%):</span><span>${f.liquido.toLocaleString(undefined, {maximumFractionDigits:0})}</span></div>
                           </div>
@@ -631,11 +741,10 @@ export default function App() {
           </div>
         )}
 
-        {/* HOME */}
         {view === 'home' && (
           <div className="text-center py-5 animate-fade">
             <h1 className="display-4 fw-bold text-contrast-fix mb-3">Dra. <span className="text-primary">Maria Joaquina</span></h1>
-            <p className="lead text-muted-fix mb-5">Gestión de Honorarios e Impuestos Quirúrgicos.</p>
+            <p className="lead text-muted-fix mb-5">Gestion de Honorarios e Impuestos Quirurgicos.</p>
             <div className="row justify-content-center g-4 px-2">
               {[ { v: 'form', i: <PlusCircle size={40}/>, t: 'Registrar Cx', c: 'text-primary' }, 
                  { v: 'calendar', i: <CalendarIcon size={40}/>, t: 'Ver Agenda', c: 'text-info' },
@@ -655,7 +764,7 @@ export default function App() {
 
       </main>
 
-      <footer className={`py-4 mt-auto border-top ${darkMode ? 'bg-dark border-secondary' : 'bg-white border-light'}`}>
+      <footer className="py-4 mt-auto border-top" style={{ backgroundColor: 'var(--bg-nav)', borderColor: darkMode ? 'var(--border-secondary)' : 'var(--navbar-border)' }}>
         <div className="container text-center">
           <p className="small text-muted-fix mb-0 fw-bold opacity-75">SurgiTrack Pro Elite v9.2 • Dra. Maria Joaquina • Impuestos: {(TAX_RATE*100).toFixed(2)}%</p>
         </div>
