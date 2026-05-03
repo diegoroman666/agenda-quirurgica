@@ -32,7 +32,10 @@ import {
   Shield,
   Loader2,
   Users,
-  Pencil
+  Pencil,
+  Activity,
+  Scissors,
+  LocateFixed
 } from 'lucide-react';
 import './App.css';
 import { supabase, isAdmin } from './supabase';
@@ -52,8 +55,12 @@ const COLOR_LABELS = {
   primary: 'Primario',
   secondary: 'Secundario',
   accent: 'Acento',
-  success: 'Éxito'
+  success: 'Exito'
 };
+
+const DEFAULT_TIPOS_CX = ['Vanguard 360', 'Laparoscopia', 'Artroscopia', 'Cirugia Abierta', 'Cirugia Robotica', 'Endoscopia', 'Microcirugia'];
+const DEFAULT_TECNICAS = ['Minimamente Invasiva', 'Abierta', 'Asistida por Robot', 'Percutanea', 'Laser', 'Electrocirugia', 'Ultrasonido'];
+const DEFAULT_ZONAS_CUERPO = ['Cabeza', 'Cuello', 'Torax', 'Abdomen', 'Extremidad Superior Izquierda', 'Extremidad Superior Derecha', 'Extremidad Inferior Izquierda', 'Extremidad Inferior Derecha', 'Columna', 'Pelvis', 'Cara', 'Mano Izquierda', 'Mano Derecha', 'Pie Izquierdo', 'Pie Derecho', 'Rodilla Izquierda', 'Rodilla Derecha', 'Cadera Izquierda', 'Cadera Derecha', 'Hombro Izquierdo', 'Hombro Derecho'];
 
 const SettingsPanel = ({ show, onClose, colors, setColors }) => {
   const handleColorChange = (key, value) => {
@@ -79,7 +86,7 @@ const SettingsPanel = ({ show, onClose, colors, setColors }) => {
             <X size={22} />
           </button>
         </div>
-        <p className="settings-subtitle">Ajusta la paleta de colores de la aplicación</p>
+        <p className="settings-subtitle">Ajusta la paleta de colores de la aplicacion</p>
 
         <div className="color-preview-row">
           {Object.values(colors).map((c, i) => (
@@ -148,15 +155,15 @@ const AuthScreen = ({ onLogin, darkMode }) => {
   };
 
   return (
-    <div className="min-vh-100 d-flex align-items-center justify-content-center" style={{ backgroundColor: 'var(--bg-primary)' }}>
+    <div className="auth-container min-vh-100 d-flex align-items-center justify-content-center">
       <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" />
-      <div className="card glass-card p-4 p-md-5 shadow-lg" style={{ maxWidth: '420px', width: '90%' }}>
+      <div className="auth-card card glass-card p-4 p-md-5 shadow-lg">
         <div className="text-center mb-4">
-          <div className="bg-primary bg-gradient p-3 rounded-4 shadow-sm d-inline-block mb-3">
+          <div className="auth-logo-bg p-3 rounded-4 shadow-sm d-inline-block mb-3">
             <Stethoscope className="text-white" size={32} />
           </div>
-          <h2 className="fw-bold text-contrast-fix m-0">SurgiTrack <span className="text-primary">Pro</span></h2>
-          <p className="text-muted-fix small">Dra. Maria Joaquina</p>
+          <h2 className="fw-bold text-contrast-fix m-0">SurgiTask <span className="text-primary">Pro</span></h2>
+          <p className="text-muted-fix small">Planner Profesional</p>
         </div>
 
         {error && (
@@ -169,7 +176,7 @@ const AuthScreen = ({ onLogin, darkMode }) => {
             <input type="email" className="form-control" value={email} onChange={e => setEmail(e.target.value)} required placeholder="tu@email.com" />
           </div>
           <div className="mb-4">
-            <label className="form-label fw-bold text-contrast-fix small">CONTRASEÑA</label>
+            <label className="form-label fw-bold text-contrast-fix small">CONTRASENA</label>
             <input type="password" className="form-control" value={password} onChange={e => setPassword(e.target.value)} required placeholder="Minimo 6 caracteres" minLength={6} />
           </div>
           <button type="submit" className="btn btn-primary w-100 p-3 rounded-pill fw-bold shadow-sm" disabled={loading}>
@@ -193,16 +200,16 @@ const AuthScreen = ({ onLogin, darkMode }) => {
 };
 
 const Navbar = ({ view, setView, darkMode, setDarkMode, onOpenSettings, user, onLogout, adminView }) => (
-  <nav className="navbar sticky-top border-bottom px-2 py-2 px-md-3 py-md-3 navbar-dark" 
+  <nav className="navbar sticky-top px-2 py-2 px-md-3 py-md-3" 
        style={{ backdropFilter: 'blur(20px)', backgroundColor: 'var(--navbar-bg)', borderColor: 'var(--navbar-border)', zIndex: 1050 }}>
     <div className="container-fluid flex-nowrap">
       <div className="d-flex align-items-center gap-2 gap-md-3" onClick={() => setView(adminView ? 'admin' : 'home')} style={{ cursor: 'pointer' }}>
-        <div className="bg-primary bg-gradient p-2 rounded-4 shadow-sm">
+        <div className="navbar-logo-bg p-2 rounded-4 shadow-sm">
           <Stethoscope className="text-white" size={20} />
         </div>
         <div className="d-flex flex-column d-none d-sm-flex">
-          <span className="fw-bold h6 mb-0 text-primary" style={{ letterSpacing: '-0.5px' }}>SurgiTrack <span className="text-info">Pro</span></span>
-          <small className="fw-bold text-uppercase" style={{ fontSize: '8px', opacity: 0.8, color: 'var(--text-contrast)' }}>Dra. Maria Joaquina</small>
+          <span className="fw-bold h6 mb-0 text-primary" style={{ letterSpacing: '-0.5px' }}>SurgiTask <span className="text-info">Pro</span></span>
+          <small className="fw-bold text-uppercase" style={{ fontSize: '8px', opacity: 0.8, color: 'var(--text-contrast)' }}>Planner Profesional</small>
         </div>
       </div>
 
@@ -213,7 +220,7 @@ const Navbar = ({ view, setView, darkMode, setDarkMode, onOpenSettings, user, on
               <PlusCircle size={18} /> <span className="d-none d-md-inline">Nueva Cx</span>
             </button>
             
-            <div className="d-flex p-1 rounded-4 border" style={{ backgroundColor: darkMode ? 'rgba(108,117,125,0.15)' : 'rgba(248,249,250,1)', borderColor: 'var(--border-secondary)' }}>
+            <div className="nav-toggle-group d-flex p-1 rounded-4 border">
               <button onClick={() => setView('dashboard')} className={`btn btn-sm px-2 px-md-3 rounded-pill fw-bold ${view === 'dashboard' ? 'btn-primary shadow-sm text-white' : 'border-0'}`} style={{ color: view !== 'dashboard' ? 'var(--text-muted)' : undefined }}>
                 <TrendingUp size={16} className="d-md-none"/> <span className="d-none d-md-inline">Analisis</span>
               </button>
@@ -313,6 +320,8 @@ const AdminView = ({ records, loading, onDelete, onRestore }) => {
                   <th>HORA</th>
                   <th>PACIENTE</th>
                   <th>CIRUGIA</th>
+                  <th>TECNICA</th>
+                  <th>ZONA</th>
                   <th>MEDICO</th>
                   <th>INSTITUCION</th>
                   <th>HONORARIOS</th>
@@ -327,6 +336,8 @@ const AdminView = ({ records, loading, onDelete, onRestore }) => {
                     <td>{r.hora}</td>
                     <td className="fw-bold">{r.paciente}</td>
                     <td>{r.tipoCx}</td>
+                    <td><span className="badge bg-info bg-opacity-10 text-info">{r.tecnica || 'N/A'}</span></td>
+                    <td><span className="badge bg-secondary bg-opacity-10 text-secondary">{r.zonaCuerpo || 'N/A'}</span></td>
                     <td><span className="badge bg-info bg-opacity-10 text-info">{r.medico || 'N/A'}</span></td>
                     <td>{r.institucion}</td>
                     <td className="fw-bold text-primary">${Number(r.valorBruto || 0).toLocaleString()}</td>
@@ -343,6 +354,47 @@ const AdminView = ({ records, loading, onDelete, onRestore }) => {
             </table>
           </div>
         )}
+      </div>
+    </div>
+  );
+};
+
+const ManagerPanel = ({ title, icon: Icon, items, setItems, storageKey }) => {
+  const [newItem, setNewItem] = useState('');
+
+  const addItem = () => {
+    if (newItem.trim() && !items.includes(newItem.trim())) {
+      const updated = [...items, newItem.trim()];
+      setItems(updated);
+      localStorage.setItem(storageKey, JSON.stringify(updated));
+      setNewItem('');
+    }
+  };
+
+  const removeItem = (index) => {
+    if (items.length > 1) {
+      const updated = items.filter((_, i) => i !== index);
+      setItems(updated);
+      localStorage.setItem(storageKey, JSON.stringify(updated));
+    }
+  };
+
+  return (
+    <div className="manager-panel p-3 rounded-4 border">
+      <h6 className="fw-bold text-contrast-fix small mb-3"><Icon size={16} className="me-2" />{title}</h6>
+      <div className="d-flex gap-2 mb-3">
+        <input type="text" className="form-control form-control-sm" placeholder="Nuevo item..." value={newItem} onChange={e => setNewItem(e.target.value)} />
+        <button type="button" className="btn btn-sm btn-primary rounded-pill" onClick={addItem}><Plus size={16} /></button>
+      </div>
+      <div className="manager-list" style={{ maxHeight: '150px', overflowY: 'auto' }}>
+        {items.map((item, i) => (
+          <div key={i} className="manager-list-item d-flex justify-content-between align-items-center px-2 py-2">
+            <span className="small text-contrast-fix">{item}</span>
+            {items.length > 1 && (
+              <button type="button" className="btn btn-sm btn-outline-danger rounded-circle p-1" onClick={() => removeItem(i)}><X size={14} /></button>
+            )}
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -379,12 +431,30 @@ export default function App() {
   const [dbLoading, setDbLoading] = useState(false);
   const [adminView, setAdminView] = useState(false);
   const [allRecords, setAllRecords] = useState([]);
+
   const [medicos, setMedicos] = useState(() => {
     const saved = localStorage.getItem('surgitrack-medicos');
     return saved ? JSON.parse(saved) : ['Dr./Dra.'];
   });
   const [showMedicoManager, setShowMedicoManager] = useState(false);
-  const [newMedico, setNewMedico] = useState('');
+
+  const [tiposCx, setTiposCx] = useState(() => {
+    const saved = localStorage.getItem('surgitrack-tipos-cx');
+    return saved ? JSON.parse(saved) : DEFAULT_TIPOS_CX;
+  });
+  const [showTipoCxManager, setShowTipoCxManager] = useState(false);
+
+  const [tecnicas, setTecnicas] = useState(() => {
+    const saved = localStorage.getItem('surgitrack-tecnicas');
+    return saved ? JSON.parse(saved) : DEFAULT_TECNICAS;
+  });
+  const [showTecnicaManager, setShowTecnicaManager] = useState(false);
+
+  const [zonasCuerpo, setZonasCuerpo] = useState(() => {
+    const saved = localStorage.getItem('surgitrack-zonas-cuerpo');
+    return saved ? JSON.parse(saved) : DEFAULT_ZONAS_CUERPO;
+  });
+  const [showZonaCuerpoManager, setShowZonaCuerpoManager] = useState(false);
 
   const [records, setRecords] = useState([]);
 
@@ -395,6 +465,8 @@ export default function App() {
     paciente: '',
     tipoCx: '',
     medico: '',
+    tecnica: '',
+    zonaCuerpo: '',
     valorBruto: '',
     deleted: false
   });
@@ -429,6 +501,18 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('surgitrack-medicos', JSON.stringify(medicos));
   }, [medicos]);
+
+  useEffect(() => {
+    localStorage.setItem('surgitrack-tipos-cx', JSON.stringify(tiposCx));
+  }, [tiposCx]);
+
+  useEffect(() => {
+    localStorage.setItem('surgitrack-tecnicas', JSON.stringify(tecnicas));
+  }, [tecnicas]);
+
+  useEffect(() => {
+    localStorage.setItem('surgitrack-zonas-cuerpo', JSON.stringify(zonasCuerpo));
+  }, [zonasCuerpo]);
 
   const fetchRecords = async () => {
     setDbLoading(true);
@@ -517,23 +601,12 @@ export default function App() {
       paciente: '',
       tipoCx: '',
       medico: '',
+      tecnica: '',
+      zonaCuerpo: '',
       valorBruto: '',
       deleted: false
     });
     setView('form');
-  };
-
-  const addMedico = () => {
-    if (newMedico.trim() && !medicos.includes(newMedico.trim())) {
-      setMedicos([...medicos, newMedico.trim()]);
-      setNewMedico('');
-    }
-  };
-
-  const removeMedico = (index) => {
-    if (medicos.length > 1) {
-      setMedicos(medicos.filter((_, i) => i !== index));
-    }
   };
 
   const exportToExcel = (dataToExport, filename) => {
@@ -542,7 +615,8 @@ export default function App() {
       const f = calculateFinance(r.valorBruto);
       return {
         "ID Registro": r.id, "Fecha": r.fecha, "Hora": r.hora, "Paciente": r.paciente,
-        "Procedimiento": r.tipoCx, "Medico": r.medico || 'N/A', "Institucion": r.institucion, "Monto Bruto ($)": f.bruto,
+        "Procedimiento": r.tipoCx, "Tecnica": r.tecnica || 'N/A', "Zona Cuerpo": r.zonaCuerpo || 'N/A',
+        "Medico": r.medico || 'N/A', "Institucion": r.institucion, "Monto Bruto ($)": f.bruto,
         "Retencion 15.25% ($)": f.retencion, "Monto Neto ($)": f.liquido
       };
     });
@@ -560,12 +634,11 @@ export default function App() {
 
     doc.setFontSize(22);
     doc.setTextColor(13, 110, 253);
-    doc.text("SurgiTrack Pro Elite", 20, 25);
+    doc.text("SurgiTask Pro - Planner Profesional", 20, 25);
     
     doc.setFontSize(12);
     doc.setTextColor(100);
     doc.text(`Reporte Financiero Mensual: ${mes}`, 20, 35);
-    doc.text(`Dra. Maria Joaquina`, 20, 42);
 
     doc.setDrawColor(200);
     doc.line(20, 50, 190, 50);
@@ -586,7 +659,7 @@ export default function App() {
 
     doc.setFontSize(10);
     doc.setTextColor(150);
-    doc.text("Generado automaticamente por SurgiTrack Pro Elite v10.0", 20, 280);
+    doc.text("SurgiTask Pro - desarrollado por Diego Roman Developer", 20, 280);
 
     doc.save(`Reporte_Financiero_${mes.replace(' ', '_')}.pdf`);
   };
@@ -651,6 +724,8 @@ export default function App() {
         paciente: '',
         tipoCx: '',
         medico: '',
+        tecnica: '',
+        zonaCuerpo: '',
         valorBruto: '',
         deleted: false
       });
@@ -844,7 +919,7 @@ export default function App() {
       <SettingsPanel show={showSettings} onClose={() => setShowSettings(false)} colors={colors} setColors={setColors} />
 
       {!adminView && (
-        <button onClick={() => { setEditingId(null); setFormData({ fecha: new Date().toISOString().split('T')[0], hora: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }), institucion: '', paciente: '', tipoCx: '', medico: '', valorBruto: '', deleted: false }); setView('form'); }} className="btn btn-primary btn-plus-float">
+        <button onClick={() => { setEditingId(null); setFormData({ fecha: new Date().toISOString().split('T')[0], hora: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }), institucion: '', paciente: '', tipoCx: '', medico: '', tecnica: '', zonaCuerpo: '', valorBruto: '', deleted: false }); setView('form'); }} className="btn btn-primary btn-plus-float">
           <Plus size={32} strokeWidth={3} />
         </button>
       )}
@@ -853,7 +928,7 @@ export default function App() {
         
         {currentView === 'form' && (
           <div className="d-flex justify-content-center animate-fade py-2">
-            <div className="card glass-card p-4 p-md-5 w-100 shadow-lg" style={{ maxWidth: '700px' }}>
+            <div className="card glass-card p-4 p-md-5 w-100 shadow-lg" style={{ maxWidth: '800px' }}>
               <div className="d-flex justify-content-between align-items-start mb-4">
                 <div className="text-start">
                   <h2 className="fw-bold text-contrast-fix m-0">{editingId ? 'Editar Cirugia' : 'Nuevo Registro'}</h2>
@@ -863,14 +938,63 @@ export default function App() {
               </div>
 
               <form onSubmit={handleSubmit} className="row g-3 text-start">
-                <div className="col-md-6"><label className="form-label fw-bold text-contrast-fix small">FECHA</label>
-                  <input type="date" className="form-control" value={formData.fecha} onChange={e => setFormData({...formData, fecha: e.target.value})} required /></div>
-                <div className="col-md-6"><label className="form-label fw-bold text-contrast-fix small">HORA</label>
-                  <input type="time" className="form-control" value={formData.hora} onChange={e => setFormData({...formData, hora: e.target.value})} required /></div>
-                <div className="col-12"><label className="form-label fw-bold text-contrast-fix small">PACIENTE</label>
-                  <input type="text" className="form-control" placeholder="Nombre completo" value={formData.paciente} onChange={e => setFormData({...formData, paciente: e.target.value})} required /></div>
-                <div className="col-12"><label className="form-label fw-bold text-contrast-fix small">CIRUGIA / PROCEDIMIENTO</label>
-                  <input type="text" className="form-control" placeholder="Tipo de cirugia" value={formData.tipoCx} onChange={e => setFormData({...formData, tipoCx: e.target.value})} required /></div>
+                <div className="col-md-6">
+                  <label className="form-label fw-bold text-contrast-fix small">FECHA</label>
+                  <input type="date" className="form-control" value={formData.fecha} onChange={e => setFormData({...formData, fecha: e.target.value})} required />
+                </div>
+                <div className="col-md-6">
+                  <label className="form-label fw-bold text-contrast-fix small">HORA</label>
+                  <input type="time" className="form-control" value={formData.hora} onChange={e => setFormData({...formData, hora: e.target.value})} required />
+                </div>
+                <div className="col-12">
+                  <label className="form-label fw-bold text-contrast-fix small">PACIENTE</label>
+                  <input type="text" className="form-control" placeholder="Nombre completo" value={formData.paciente} onChange={e => setFormData({...formData, paciente: e.target.value})} required />
+                </div>
+                <div className="col-12">
+                  <label className="form-label fw-bold text-contrast-fix small d-flex justify-content-between align-items-center">
+                    TIPO DE CIRUGIA / PROCEDIMIENTO
+                    <button type="button" className="btn btn-sm btn-outline-primary rounded-pill py-0 px-2" onClick={() => setShowTipoCxManager(!showTipoCxManager)}>
+                      <Pencil size={12} className="me-1" /> Gestionar
+                    </button>
+                  </label>
+                  <select className="form-select" value={formData.tipoCx} onChange={e => setFormData({...formData, tipoCx: e.target.value})} required>
+                    <option value="">Seleccionar tipo de cirugia...</option>
+                    {tiposCx.map((t, i) => <option key={i} value={t}>{t}</option>)}
+                  </select>
+                  {showTipoCxManager && (
+                    <ManagerPanel title="Tipos de Cirugia" icon={Scissors} items={tiposCx} setItems={setTiposCx} storageKey="surgitrack-tipos-cx" />
+                  )}
+                </div>
+                <div className="col-md-6">
+                  <label className="form-label fw-bold text-contrast-fix small d-flex justify-content-between align-items-center">
+                    TECNICA QUIRURGICA
+                    <button type="button" className="btn btn-sm btn-outline-accent rounded-pill py-0 px-2" onClick={() => setShowTecnicaManager(!showTecnicaManager)}>
+                      <Pencil size={12} className="me-1" /> Gestionar
+                    </button>
+                  </label>
+                  <select className="form-select" value={formData.tecnica} onChange={e => setFormData({...formData, tecnica: e.target.value})} required>
+                    <option value="">Seleccionar tecnica...</option>
+                    {tecnicas.map((t, i) => <option key={i} value={t}>{t}</option>)}
+                  </select>
+                  {showTecnicaManager && (
+                    <ManagerPanel title="Tecnicas Quirurgicas" icon={Activity} items={tecnicas} setItems={setTecnicas} storageKey="surgitrack-tecnicas" />
+                  )}
+                </div>
+                <div className="col-md-6">
+                  <label className="form-label fw-bold text-contrast-fix small d-flex justify-content-between align-items-center">
+                    ZONA DEL CUERPO
+                    <button type="button" className="btn btn-sm btn-outline-secondary rounded-pill py-0 px-2" onClick={() => setShowZonaCuerpoManager(!showZonaCuerpoManager)}>
+                      <Pencil size={12} className="me-1" /> Gestionar
+                    </button>
+                  </label>
+                  <select className="form-select" value={formData.zonaCuerpo} onChange={e => setFormData({...formData, zonaCuerpo: e.target.value})} required>
+                    <option value="">Seleccionar zona...</option>
+                    {zonasCuerpo.map((z, i) => <option key={i} value={z}>{z}</option>)}
+                  </select>
+                  {showZonaCuerpoManager && (
+                    <ManagerPanel title="Zonas del Cuerpo" icon={LocateFixed} items={zonasCuerpo} setItems={setZonasCuerpo} storageKey="surgitrack-zonas-cuerpo" />
+                  )}
+                </div>
                 <div className="col-12">
                   <label className="form-label fw-bold text-contrast-fix small d-flex justify-content-between align-items-center">
                     MEDICO QUE OPERA
@@ -882,33 +1006,23 @@ export default function App() {
                     <option value="">Seleccionar medico...</option>
                     {medicos.map((m, i) => <option key={i} value={m}>{m}</option>)}
                   </select>
+                  {showMedicoManager && (
+                    <ManagerPanel title="Medicos" icon={Users} items={medicos} setItems={setMedicos} storageKey="surgitrack-medicos" />
+                  )}
                 </div>
-                {showMedicoManager && (
-                  <div className="col-12">
-                    <div className="p-3 rounded-4 border" style={{ backgroundColor: 'var(--bg-card-alt)', borderColor: 'var(--border-color)' }}>
-                      <h6 className="fw-bold text-contrast-fix small mb-3"><Users size={16} className="me-2" />Gestionar Medicos</h6>
-                      <div className="d-flex gap-2 mb-3">
-                        <input type="text" className="form-control form-control-sm" placeholder="Nombre del medico" value={newMedico} onChange={e => setNewMedico(e.target.value)} />
-                        <button type="button" className="btn btn-sm btn-primary rounded-pill" onClick={addMedico}><Plus size={16} /></button>
-                      </div>
-                      <div className="list-group list-group-flush">
-                        {medicos.map((m, i) => (
-                          <div key={i} className="list-group-item d-flex justify-content-between align-items-center px-0 py-2" style={{ backgroundColor: 'transparent', borderColor: 'var(--border-color)' }}>
-                            <span className="small text-contrast-fix">{m}</span>
-                            {medicos.length > 1 && (
-                              <button type="button" className="btn btn-sm btn-outline-danger rounded-circle p-1" onClick={() => removeMedico(i)}><X size={14} /></button>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                )}
-                <div className="col-12"><label className="form-label fw-bold text-contrast-fix small">INSTITUCION</label>
-                  <input type="text" className="form-control" placeholder="Clinica o Hospital" value={formData.institucion} onChange={e => setFormData({...formData, institucion: e.target.value})} required /></div>
-                <div className="col-12"><label className="form-label fw-bold text-contrast-fix small">HONORARIOS BRUTOS ($)</label>
-                  <input type="number" className="form-control fw-bold text-primary h4 py-3" value={formData.valorBruto} onChange={e => setFormData({...formData, valorBruto: e.target.value})} required /></div>
-                <div className="col-12 mt-4"><button type="submit" className="btn btn-primary w-100 p-3 rounded-pill fw-bold shadow-sm" disabled={dbLoading}>{dbLoading ? <Loader2 size={20} className="spinner-border" /> : (editingId ? 'Guardar Cambios' : 'Confirmar Registro')}</button></div>
+                <div className="col-12">
+                  <label className="form-label fw-bold text-contrast-fix small">INSTITUCION</label>
+                  <input type="text" className="form-control" placeholder="Clinica o Hospital" value={formData.institucion} onChange={e => setFormData({...formData, institucion: e.target.value})} required />
+                </div>
+                <div className="col-12">
+                  <label className="form-label fw-bold text-contrast-fix small">HONORARIOS BRUTOS ($)</label>
+                  <input type="number" className="form-control fw-bold text-primary h4 py-3" value={formData.valorBruto} onChange={e => setFormData({...formData, valorBruto: e.target.value})} required />
+                </div>
+                <div className="col-12 mt-4">
+                  <button type="submit" className="btn btn-primary w-100 p-3 rounded-pill fw-bold shadow-sm" disabled={dbLoading}>
+                    {dbLoading ? <Loader2 size={20} className="spinner-border" /> : (editingId ? 'Guardar Cambios' : 'Confirmar Registro')}
+                  </button>
+                </div>
               </form>
             </div>
           </div>
@@ -1006,7 +1120,12 @@ export default function App() {
                                 <span className="text-primary">${Number(r.valorBruto).toLocaleString()}</span>
                               </div>
                               <div className="text-contrast-fix fw-bold small">{r.paciente}</div>
-                              <div className="text-muted-fix x-small mt-1" style={{ fontSize: '11px' }}>{r.tipoCx} • {r.medico || 'Sin medico'} • {r.institucion}</div>
+                              <div className="record-detail-line">
+                                <span className="badge bg-primary bg-opacity-10 text-primary me-1">{r.tipoCx}</span>
+                                {r.tecnica && <span className="badge bg-accent bg-opacity-10 text-accent me-1">{r.tecnica}</span>}
+                                {r.zonaCuerpo && <span className="badge bg-secondary bg-opacity-10 text-secondary me-1">{r.zonaCuerpo}</span>}
+                              </div>
+                              <div className="text-muted-fix x-small mt-1" style={{ fontSize: '11px' }}>{r.medico || 'Sin medico'} • {r.institucion}</div>
                             </div>
                           ))
                         )}
@@ -1143,6 +1262,10 @@ export default function App() {
                           </div>
                           <h5 className="fw-bold text-contrast-fix mb-1 text-start">{r.paciente}</h5>
                           <p className="text-primary small mb-1 fw-bold text-start">{r.tipoCx}</p>
+                          <div className="record-tags mb-2">
+                            {r.tecnica && <span className="badge bg-accent bg-opacity-10 text-accent me-1 mb-1">{r.tecnica}</span>}
+                            {r.zonaCuerpo && <span className="badge bg-secondary bg-opacity-10 text-secondary me-1 mb-1">{r.zonaCuerpo}</span>}
+                          </div>
                           {r.medico && <p className="text-info small mb-3 fw-bold text-start"><Stethoscope size={12} className="me-1"/>{r.medico}</p>}
                           <div className="p-3 rounded-4 mb-3" style={{ backgroundColor: darkMode ? 'rgba(108,117,125,0.1)' : 'var(--bg-card-alt)' }}>
                             <div className="d-flex justify-content-between small text-start"><span>Bruto:</span><span className="fw-bold text-contrast-fix">${f.bruto.toLocaleString()}</span></div>
@@ -1167,8 +1290,8 @@ export default function App() {
 
         {currentView === 'home' && (
           <div className="text-center py-5 animate-fade">
-            <h1 className="display-4 fw-bold text-contrast-fix mb-3">Dra. <span className="text-primary">Maria Joaquina</span></h1>
-            <p className="lead text-muted-fix mb-5">Gestion de Honorarios e Impuestos Quirurgicos.</p>
+            <h1 className="display-4 fw-bold text-contrast-fix mb-3">SurgiTask <span className="text-primary">Pro</span></h1>
+            <p className="lead text-muted-fix mb-5">Planner Profesional - Gestion de Honorarios e Impuestos Quirurgicos.</p>
             <div className="row justify-content-center g-4 px-2">
               {[ { v: 'form', i: <PlusCircle size={40}/>, t: 'Registrar Cx', c: 'text-primary' }, 
                  { v: 'calendar', i: <CalendarIcon size={40}/>, t: 'Ver Agenda', c: 'text-info' },
@@ -1190,7 +1313,7 @@ export default function App() {
 
       <footer className="py-4 mt-auto border-top" style={{ backgroundColor: 'var(--bg-nav)', borderColor: darkMode ? 'var(--border-secondary)' : 'var(--navbar-border)' }}>
         <div className="container text-center">
-          <p className="small text-muted-fix mb-0 fw-bold opacity-75">SurgiTrack Pro Elite v10.0 • Dra. Maria Joaquina • Impuestos: {(TAX_RATE*100).toFixed(2)}%</p>
+          <p className="small text-muted-fix mb-0 fw-bold opacity-75">SurgiTask Pro - desarrollado por Diego Roman Developer - Todos los derechos reservados 2026</p>
         </div>
       </footer>
     </div>
