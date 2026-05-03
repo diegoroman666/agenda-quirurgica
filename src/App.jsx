@@ -35,7 +35,8 @@ import {
   Pencil,
   Activity,
   Scissors,
-  LocateFixed
+  LocateFixed,
+  Building2
 } from 'lucide-react';
 import './App.css';
 import { supabase, isAdmin } from './supabase';
@@ -455,6 +456,12 @@ export default function App() {
     return saved ? JSON.parse(saved) : DEFAULT_ZONAS_CUERPO;
   });
   const [showZonaCuerpoManager, setShowZonaCuerpoManager] = useState(false);
+
+  const [instituciones, setInstituciones] = useState(() => {
+    const saved = localStorage.getItem('surgitrack-instituciones');
+    return saved ? JSON.parse(saved) : ['Dr. Franco Ravera Zunino', 'Isamedica', 'Hospital San Fernando', 'Hospital Santacruz', 'Red Salud', 'Cleber', 'Fusat'];
+  });
+  const [showInstitucionManager, setShowInstitucionManager] = useState(false);
 
   const [records, setRecords] = useState([]);
 
@@ -1011,8 +1018,19 @@ export default function App() {
                   )}
                 </div>
                 <div className="col-12">
-                  <label className="form-label fw-bold text-contrast-fix small">INSTITUCION</label>
-                  <input type="text" className="form-control" placeholder="Clinica o Hospital" value={formData.institucion} onChange={e => setFormData({...formData, institucion: e.target.value})} required />
+                  <label className="form-label fw-bold text-contrast-fix small d-flex justify-content-between align-items-center">
+                    INSTITUCION
+                    <button type="button" className="btn btn-sm btn-outline-success rounded-pill py-0 px-2" onClick={() => setShowInstitucionManager(!showInstitucionManager)}>
+                      <Pencil size={12} className="me-1" /> Gestionar
+                    </button>
+                  </label>
+                  <select className="form-select" value={formData.institucion} onChange={e => setFormData({...formData, institucion: e.target.value})} required>
+                    <option value="">Seleccionar institucion...</option>
+                    {instituciones.map((inst, i) => <option key={i} value={inst}>{inst}</option>)}
+                  </select>
+                  {showInstitucionManager && (
+                    <ManagerPanel title="Instituciones" icon={Building2} items={instituciones} setItems={setInstituciones} storageKey="surgitrack-instituciones" />
+                  )}
                 </div>
                 <div className="col-12">
                   <label className="form-label fw-bold text-contrast-fix small">HONORARIOS BRUTOS ($)</label>
