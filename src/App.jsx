@@ -24,9 +24,18 @@ import {
   Receipt,
   RotateCcw,
   Settings,
-  Palette
+  Palette,
+  LogIn,
+  UserPlus,
+  LogOut,
+  User,
+  Shield,
+  Loader2,
+  Users,
+  Pencil
 } from 'lucide-react';
 import './App.css';
+import { supabase, isAdmin } from './supabase';
 
 const XLSX_SCRIPT_URL = "https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js";
 const JSPDF_SCRIPT_URL = "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js";
@@ -107,11 +116,87 @@ const SettingsPanel = ({ show, onClose, colors, setColors }) => {
   );
 };
 
-const Navbar = ({ view, setView, darkMode, setDarkMode, onOpenSettings }) => (
+const AuthScreen = ({ onLogin, darkMode }) => {
+  const [isLogin, setIsLogin] = useState(true);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+
+    try {
+      if (isLogin) {
+        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) throw error;
+        onLogin(data.user);
+      } else {
+        const { data, error } = await supabase.auth.signUp({ email, password });
+        if (error) throw error;
+        if (data.user) {
+          onLogin(data.user);
+        }
+      }
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-vh-100 d-flex align-items-center justify-content-center" style={{ backgroundColor: 'var(--bg-primary)' }}>
+      <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet />
+      <div className="card glass-card p-4 p-md-5 shadow-lg" style={{ maxWidth: '420px', width: '90%' }}>
+        <div className="text-center mb-4">
+          <div className="bg-primary bg-gradient p-3 rounded-4 shadow-sm d-inline-block mb-3">
+            <Stethoscope className="text-white" size={32} />
+          </div>
+          <h2 className="fw-bold text-contrast-fix m-0">SurgiTrack <span className="text-primary">Pro</span></h2>
+          <p className="text-muted-fix small">Dra. Maria Joaquina</p>
+        </div>
+
+        {error && (
+          <div className="alert alert-danger py-2 small">{error}</div>
+        )}
+
+        <form onSubmit={handleSubmit}>
+          <div className="mb-3">
+            <label className="form-label fw-bold text-contrast-fix small">EMAIL</label>
+            <input type="email" className="form-control" value={email} onChange={e => setEmail(e.target.value)} required placeholder="tu@email.com" />
+          </div>
+          <div className="mb-4">
+            <label className="form-label fw-bold text-contrast-fix small">CONTRASEÑA</label>
+            <input type="password" className="form-control" value={password} onChange={e => setPassword(e.target.value)} required placeholder="Minimo 6 caracteres" minLength={6} />
+          </div>
+          <button type="submit" className="btn btn-primary w-100 p-3 rounded-pill fw-bold shadow-sm" disabled={loading}>
+            {loading ? <Loader2 size={20} className="spinner-border" /> : (
+              <>
+                {isLogin ? <LogIn size={18} className="me-2" /> : <UserPlus size={18} className="me-2" />}
+                {isLogin ? 'Iniciar Sesion' : 'Registrarse'}
+              </>
+            )}
+          </button>
+        </form>
+
+        <div className="text-center mt-4">
+          <button className="btn btn-link text-decoration-none small" onClick={() => { setIsLogin(!isLogin); setError(''); }}>
+            {isLogin ? 'No tienes cuenta? Registrate' : 'Ya tienes cuenta? Inicia sesion'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const Navbar = ({ view, setView, darkMode, setDarkMode, onOpenSettings, user, onLogout, adminView }) => (
   <nav className="navbar sticky-top border-bottom px-2 py-2 px-md-3 py-md-3 navbar-dark" 
        style={{ backdropFilter: 'blur(20px)', backgroundColor: 'var(--navbar-bg)', borderColor: 'var(--navbar-border)', zIndex: 1050 }}>
     <div className="container-fluid flex-nowrap">
-      <div className="d-flex align-items-center gap-2 gap-md-3" onClick={() => setView('home')} style={{ cursor: 'pointer' }}>
+      <div className="d-flex align-items-center gap-2 gap-md-3" onClick={() => setView(adminView ? 'admin' : 'home')} style={{ cursor: 'pointer' }}>
         <div className="bg-primary bg-gradient p-2 rounded-4 shadow-sm">
           <Stethoscope className="text-white" size={20} />
         </div>
@@ -122,22 +207,32 @@ const Navbar = ({ view, setView, darkMode, setDarkMode, onOpenSettings }) => (
       </div>
 
       <div className="d-flex align-items-center gap-1 gap-md-2">
-        <button onClick={() => setView('form')} className="btn btn-primary btn-sm rounded-pill px-3 fw-bold d-flex align-items-center gap-1 me-2 shadow-sm">
-          <PlusCircle size={18} /> <span className="d-none d-md-inline">Nueva Cx</span>
-        </button>
+        {!adminView && (
+          <>
+            <button onClick={() => setView('form')} className="btn btn-primary btn-sm rounded-pill px-3 fw-bold d-flex align-items-center gap-1 me-2 shadow-sm">
+              <PlusCircle size={18} /> <span className="d-none d-md-inline">Nueva Cx</span>
+            </button>
+            
+            <div className="d-flex p-1 rounded-4 border" style={{ backgroundColor: darkMode ? 'rgba(108,117,125,0.15)' : 'rgba(248,249,250,1)', borderColor: 'var(--border-secondary)' }}>
+              <button onClick={() => setView('dashboard')} className={`btn btn-sm px-2 px-md-3 rounded-pill fw-bold ${view === 'dashboard' ? 'btn-primary shadow-sm text-white' : 'border-0'}`} style={{ color: view !== 'dashboard' ? 'var(--text-muted)' : undefined }}>
+                <TrendingUp size={16} className="d-md-none"/> <span className="d-none d-md-inline">Analisis</span>
+              </button>
+              <button onClick={() => setView('calendar')} className={`btn btn-sm px-2 px-md-3 rounded-pill fw-bold ${view === 'calendar' ? 'btn-primary shadow-sm text-white' : 'border-0'}`} style={{ color: view !== 'calendar' ? 'var(--text-muted)' : undefined }}>
+                <CalendarIcon size={16} className="d-md-none"/> <span className="d-none d-md-inline">Agenda</span>
+              </button>
+              <button onClick={() => setView('history')} className={`btn btn-sm px-2 px-md-3 rounded-pill fw-bold ${view === 'history' ? 'btn-primary shadow-sm text-white' : 'border-0'}`} style={{ color: view !== 'history' ? 'var(--text-muted)' : undefined }}>
+                <ClipboardList size={16} className="d-md-none"/> <span className="d-none d-md-inline">Registros</span>
+              </button>
+            </div>
+          </>
+        )}
         
-        <div className="d-flex p-1 rounded-4 border" style={{ backgroundColor: darkMode ? 'rgba(108,117,125,0.15)' : 'rgba(248,249,250,1)', borderColor: 'var(--border-secondary)' }}>
-          <button onClick={() => setView('dashboard')} className={`btn btn-sm px-2 px-md-3 rounded-pill fw-bold ${view === 'dashboard' ? 'btn-primary shadow-sm text-white' : 'border-0'}`} style={{ color: view !== 'dashboard' ? 'var(--text-muted)' : undefined }}>
-            <TrendingUp size={16} className="d-md-none"/> <span className="d-none d-md-inline">Análisis</span>
+        {isAdmin(user) && (
+          <button onClick={() => setView(adminView ? 'home' : 'admin')} className={`btn btn-sm rounded-pill fw-bold px-3 ${adminView ? 'btn-warning' : 'btn-outline-warning'}`}>
+            <Shield size={16} className="me-1" /> {adminView ? 'Volver' : 'Admin'}
           </button>
-          <button onClick={() => setView('calendar')} className={`btn btn-sm px-2 px-md-3 rounded-pill fw-bold ${view === 'calendar' ? 'btn-primary shadow-sm text-white' : 'border-0'}`} style={{ color: view !== 'calendar' ? 'var(--text-muted)' : undefined }}>
-            <CalendarIcon size={16} className="d-md-none"/> <span className="d-none d-md-inline">Agenda</span>
-          </button>
-          <button onClick={() => setView('history')} className={`btn btn-sm px-2 px-md-3 rounded-pill fw-bold ${view === 'history' ? 'btn-primary shadow-sm text-white' : 'border-0'}`} style={{ color: view !== 'history' ? 'var(--text-muted)' : undefined }}>
-            <ClipboardList size={16} className="d-md-none"/> <span className="d-none d-md-inline">Registros</span>
-          </button>
-        </div>
-        
+        )}
+
         <button onClick={onOpenSettings} className="btn border-0 p-2 rounded-circle" style={{ color: 'var(--text-muted)' }} title="Personalizar colores">
           <Settings size={20} />
         </button>
@@ -145,10 +240,113 @@ const Navbar = ({ view, setView, darkMode, setDarkMode, onOpenSettings }) => (
         <button onClick={() => setDarkMode(!darkMode)} className={`btn border-0 p-2 rounded-circle ${darkMode ? 'text-warning' : 'text-secondary'}`}>
           {darkMode ? <Sun size={20} /> : <Moon size={20} />}
         </button>
+
+        <div className="dropdown">
+          <button className="btn border-0 p-2 rounded-circle" style={{ color: 'var(--text-muted)' }} data-bs-toggle="dropdown">
+            <User size={20} />
+          </button>
+          <ul className="dropdown-menu dropdown-menu-end">
+            <li><span className="dropdown-item-text small fw-bold text-truncate" style={{ maxWidth: '200px' }}>{user.email}</span></li>
+            <li><hr className="dropdown-divider" /></li>
+            <li><button className="dropdown-item text-danger" onClick={onLogout}><LogOut size={16} className="me-2" />Cerrar Sesion</button></li>
+          </ul>
+        </div>
       </div>
     </div>
   </nav>
 );
+
+const AdminView = ({ records, loading, onDelete, onRestore }) => {
+  const [searchTerm, setSearchTerm] = useState('');
+
+  const filteredRecords = useMemo(() => {
+    return records.filter(r => {
+      const term = searchTerm.toLowerCase();
+      return (
+        r.paciente?.toLowerCase().includes(term) ||
+        r.tipoCx?.toLowerCase().includes(term) ||
+        r.institucion?.toLowerCase().includes(term) ||
+        r.medico?.toLowerCase().includes(term)
+      );
+    });
+  }, [records, searchTerm]);
+
+  if (loading) {
+    return (
+      <div className="text-center py-5">
+        <Loader2 size={40} className="spinner-border text-primary" />
+        <p className="text-muted-fix mt-3">Cargando todas las cirugias...</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="animate-fade text-start">
+      <div className="d-flex flex-column flex-lg-row justify-content-between align-items-start align-items-lg-center mb-4 gap-3">
+        <div>
+          <h2 className="fw-bold text-contrast-fix m-0"><Shield size={28} className="me-2 text-warning" />Panel de Administrador</h2>
+          <p className="text-muted-fix small">Todas las cirugias registradas por todos los usuarios</p>
+        </div>
+        <div className="position-relative flex-grow-1" style={{ maxWidth: '350px' }}>
+          <Search className="position-absolute top-50 start-0 translate-middle-y ms-3" style={{ color: 'var(--text-muted)' }} size={18} />
+          <input type="text" className="form-control ps-5 rounded-pill" placeholder="Buscar..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+        </div>
+      </div>
+
+      <div className="glass-card p-3 p-md-4 shadow-sm">
+        <div className="d-flex justify-content-between align-items-center mb-3">
+          <span className="badge bg-warning rounded-pill px-3">{filteredRecords.length} registros totales</span>
+        </div>
+
+        {filteredRecords.length === 0 ? (
+          <div className="text-center py-5">
+            <ClipboardList size={60} className="text-muted opacity-25 mb-3" />
+            <p className="text-muted-fix h5">No hay registros.</p>
+          </div>
+        ) : (
+          <div className="table-responsive">
+            <table className={`table table-hover align-middle mb-0`} style={{ color: 'var(--text-contrast)' }}>
+              <thead>
+                <tr className="small text-muted">
+                  <th>USUARIO</th>
+                  <th>FECHA</th>
+                  <th>HORA</th>
+                  <th>PACIENTE</th>
+                  <th>CIRUGIA</th>
+                  <th>MEDICO</th>
+                  <th>INSTITUCION</th>
+                  <th>HONORARIOS</th>
+                  <th className="text-end">ACCIONES</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredRecords.map(r => (
+                  <tr key={r.id} className={r.deleted ? 'opacity-50' : ''}>
+                    <td className="small text-muted-fix">{r.user_email || 'N/A'}</td>
+                    <td>{r.fecha}</td>
+                    <td>{r.hora}</td>
+                    <td className="fw-bold">{r.paciente}</td>
+                    <td>{r.tipoCx}</td>
+                    <td><span className="badge bg-info bg-opacity-10 text-info">{r.medico || 'N/A'}</span></td>
+                    <td>{r.institucion}</td>
+                    <td className="fw-bold text-primary">${Number(r.valorBruto || 0).toLocaleString()}</td>
+                    <td className="text-end">
+                      {r.deleted ? (
+                        <button onClick={() => onRestore(r.id)} title="Restaurar" className="btn btn-sm btn-outline-success rounded-circle"><RotateCcw size={14}/></button>
+                      ) : (
+                        <button onClick={() => onDelete(r.id)} title="Eliminar" className="btn btn-sm btn-outline-danger rounded-circle"><Trash2 size={14}/></button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
 
 export default function App() {
   const [darkMode, setDarkMode] = useState(() => {
@@ -176,14 +374,101 @@ export default function App() {
   const [searchTerm, setSearchTerm] = useState('');
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
 
-  const [records, setRecords] = useState(() => {
-    const saved = localStorage.getItem('mj_surgical_v9_2');
-    return saved ? JSON.parse(saved) : [];
+  const [user, setUser] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [dbLoading, setDbLoading] = useState(false);
+  const [adminView, setAdminView] = useState(false);
+  const [allRecords, setAllRecords] = useState([]);
+  const [medicos, setMedicos] = useState(() => {
+    const saved = localStorage.getItem('surgitrack-medicos');
+    return saved ? JSON.parse(saved) : ['Dr./Dra.'];
+  });
+  const [showMedicoManager, setShowMedicoManager] = useState(false);
+  const [newMedico, setNewMedico] = useState('');
+
+  const [records, setRecords] = useState([]);
+
+  const [formData, setFormData] = useState({
+    fecha: new Date().toISOString().split('T')[0],
+    hora: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }),
+    institucion: '',
+    paciente: '',
+    tipoCx: '',
+    medico: '',
+    valorBruto: '',
+    deleted: false
   });
 
   useEffect(() => {
-    localStorage.setItem('mj_surgical_v9_2', JSON.stringify(records));
-  }, [records]);
+    const initAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        setUser(session.user);
+      }
+      setAuthLoading(false);
+    };
+    initAuth();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user || null);
+      setAdminView(false);
+      if (!session?.user) {
+        setView('home');
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    if (user) {
+      fetchRecords();
+    }
+  }, [user]);
+
+  useEffect(() => {
+    localStorage.setItem('surgitrack-medicos', JSON.stringify(medicos));
+  }, [medicos]);
+
+  const fetchRecords = async () => {
+    setDbLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('cirugias')
+        .select('*')
+        .order('fecha', { ascending: false });
+      
+      if (error) throw error;
+      setRecords(data || []);
+    } catch (err) {
+      console.error('Error fetching records:', err);
+    } finally {
+      setDbLoading(false);
+    }
+  };
+
+  const fetchAllRecords = async () => {
+    setDbLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('cirugias')
+        .select('*')
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      setAllRecords(data || []);
+    } catch (err) {
+      console.error('Error fetching all records:', err);
+    } finally {
+      setDbLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (adminView && isAdmin(user)) {
+      fetchAllRecords();
+    }
+  }, [adminView, user]);
 
   useEffect(() => {
     localStorage.setItem('surgitrack-dark', String(darkMode));
@@ -206,6 +491,13 @@ export default function App() {
     });
   }, []);
 
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    setUser(null);
+    setRecords([]);
+    setAdminView(false);
+  };
+
   const calculateFinance = (bruto) => {
     const val = parseFloat(bruto) || 0;
     const retencion = val * TAX_RATE;
@@ -213,29 +505,35 @@ export default function App() {
     return { bruto: val, retencion, liquido };
   };
 
-  const initialForm = {
-    fecha: new Date().toISOString().split('T')[0],
-    hora: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }),
-    institucion: '',
-    paciente: '',
-    tipoCx: '',
-    valorBruto: '',
-    deleted: false
-  };
-
-  const [formData, setFormData] = useState(initialForm);
-
   const activeRecords = useMemo(() => records.filter(r => !r.deleted), [records]);
   const trashedRecords = useMemo(() => records.filter(r => r.deleted), [records]);
 
   const openFormWithDate = (dateStr) => {
     setEditingId(null);
     setFormData({
-      ...initialForm,
       fecha: dateStr,
-      hora: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })
+      hora: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }),
+      institucion: '',
+      paciente: '',
+      tipoCx: '',
+      medico: '',
+      valorBruto: '',
+      deleted: false
     });
     setView('form');
+  };
+
+  const addMedico = () => {
+    if (newMedico.trim() && !medicos.includes(newMedico.trim())) {
+      setMedicos([...medicos, newMedico.trim()]);
+      setNewMedico('');
+    }
+  };
+
+  const removeMedico = (index) => {
+    if (medicos.length > 1) {
+      setMedicos(medicos.filter((_, i) => i !== index));
+    }
   };
 
   const exportToExcel = (dataToExport, filename) => {
@@ -244,7 +542,7 @@ export default function App() {
       const f = calculateFinance(r.valorBruto);
       return {
         "ID Registro": r.id, "Fecha": r.fecha, "Hora": r.hora, "Paciente": r.paciente,
-        "Procedimiento": r.tipoCx, "Institucion": r.institucion, "Monto Bruto ($)": f.bruto,
+        "Procedimiento": r.tipoCx, "Medico": r.medico || 'N/A', "Institucion": r.institucion, "Monto Bruto ($)": f.bruto,
         "Retencion 15.25% ($)": f.retencion, "Monto Neto ($)": f.liquido
       };
     });
@@ -288,7 +586,7 @@ export default function App() {
 
     doc.setFontSize(10);
     doc.setTextColor(150);
-    doc.text("Generado automaticamente por SurgiTrack Pro Elite v9.2", 20, 280);
+    doc.text("Generado automaticamente por SurgiTrack Pro Elite v10.0", 20, 280);
 
     doc.save(`Reporte_Financiero_${mes.replace(' ', '_')}.pdf`);
   };
@@ -307,9 +605,10 @@ export default function App() {
   const filteredHistory = useMemo(() => {
     return activeRecords.filter(r => {
       const matchesSearch = 
-        r.paciente.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        r.tipoCx.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        r.institucion.toLowerCase().includes(searchTerm.toLowerCase());
+        r.paciente?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        r.tipoCx?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        r.institucion?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        r.medico?.toLowerCase().includes(searchTerm.toLowerCase());
       
       const dateVal = new Date(r.fecha + "T00:00:00");
       const startLimit = dateRange.start ? new Date(dateRange.start + "T00:00:00") : null;
@@ -320,35 +619,106 @@ export default function App() {
     });
   }, [activeRecords, searchTerm, dateRange]);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (editingId) {
-      setRecords(prev => prev.map(r => r.id === editingId ? { ...formData, id: r.id } : r));
+    setDbLoading(true);
+    try {
+      const recordData = {
+        ...formData,
+        user_id: user.id,
+        user_email: user.email,
+        created_by: user.email
+      };
+
+      if (editingId) {
+        const { error } = await supabase
+          .from('cirugias')
+          .update(recordData)
+          .eq('id', editingId);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from('cirugias')
+          .insert([{ ...recordData, id: `CX-${Date.now()}` }]);
+        if (error) throw error;
+      }
+      
+      await fetchRecords();
+      setFormData({
+        fecha: new Date().toISOString().split('T')[0],
+        hora: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }),
+        institucion: '',
+        paciente: '',
+        tipoCx: '',
+        medico: '',
+        valorBruto: '',
+        deleted: false
+      });
       setEditingId(null);
-    } else {
-      setRecords([{ ...formData, id: `CX-${Date.now()}` }, ...records]);
+      setView('history');
+    } catch (err) {
+      console.error('Error saving record:', err);
+      alert('Error al guardar: ' + err.message);
+    } finally {
+      setDbLoading(false);
     }
-    setFormData(initialForm);
-    setView('history');
   };
 
-  const softDelete = (id) => {
-    setRecords(prev => prev.map(r => r.id === id ? { ...r, deleted: true } : r));
-    if(selectedDayRecords) {
+  const softDelete = async (id) => {
+    try {
+      const { error } = await supabase
+        .from('cirugias')
+        .update({ deleted: true })
+        .eq('id', id);
+      if (error) throw error;
+      await fetchRecords();
+      if(selectedDayRecords) {
         setSelectedDayRecords(prev => ({
-            ...prev,
-            records: prev.records.filter(r => r.id !== id)
+          ...prev,
+          records: prev.records.filter(r => r.id !== id)
         }));
+      }
+    } catch (err) {
+      console.error('Error deleting:', err);
     }
   };
 
-  const restoreRecord = (id) => {
-    setRecords(prev => prev.map(r => r.id === id ? { ...r, deleted: false } : r));
+  const restoreRecord = async (id) => {
+    try {
+      const { error } = await supabase
+        .from('cirugias')
+        .update({ deleted: false })
+        .eq('id', id);
+      if (error) throw error;
+      await fetchRecords();
+    } catch (err) {
+      console.error('Error restoring:', err);
+    }
   };
 
-  const hardDelete = (id) => {
-    if(confirm('Eliminar definitivamente de la papelera?')) {
-      setRecords(prev => prev.filter(r => r.id !== id));
+  const adminDelete = async (id) => {
+    try {
+      const { error } = await supabase
+        .from('cirugias')
+        .update({ deleted: true })
+        .eq('id', id);
+      if (error) throw error;
+      await fetchAllRecords();
+    } catch (err) {
+      console.error('Error admin delete:', err);
+    }
+  };
+
+  const adminRestore = async (id) => {
+    try {
+      const { error } = await supabase
+        .from('cirugias')
+        .update({ deleted: false })
+        .eq('id', id);
+      if (error) throw error;
+      await fetchAllRecords();
+    } catch (err) {
+      console.error('Error admin restore:', err);
     }
   };
 
@@ -374,9 +744,23 @@ export default function App() {
     return { bruto, retencion, liquido };
   }, [selectedDayRecords]);
 
+  if (authLoading) {
+    return (
+      <div className="min-vh-100 d-flex align-items-center justify-content-center" style={{ backgroundColor: 'var(--bg-primary)' }}>
+        <Loader2 size={40} className="spinner-border text-primary" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <AuthScreen onLogin={setUser} darkMode={darkMode} />;
+  }
+
+  const currentView = adminView ? 'admin' : view;
+
   return (
     <div className="min-vh-100 d-flex flex-column" style={{ width: '100vw', overflowX: 'hidden', backgroundColor: 'var(--bg-primary)', color: 'var(--text-contrast)' }}>
-      <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" />
+      <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet />
       <style>{`
         body { font-family: 'Inter', sans-serif; background: var(--bg-primary); color: var(--text-contrast); }
         .text-contrast-fix { color: var(--text-contrast) !important; }
@@ -455,17 +839,19 @@ export default function App() {
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
       `}</style>
 
-      <Navbar view={view} setView={setView} darkMode={darkMode} setDarkMode={setDarkMode} onOpenSettings={() => setShowSettings(true)} />
+      <Navbar view={view} setView={(v) => { setView(v); setAdminView(false); }} darkMode={darkMode} setDarkMode={setDarkMode} onOpenSettings={() => setShowSettings(true)} user={user} onLogout={handleLogout} adminView={adminView} />
 
       <SettingsPanel show={showSettings} onClose={() => setShowSettings(false)} colors={colors} setColors={setColors} />
 
-      <button onClick={() => { setEditingId(null); setFormData(initialForm); setView('form'); }} className="btn btn-primary btn-plus-float">
-        <Plus size={32} strokeWidth={3} />
-      </button>
+      {!adminView && (
+        <button onClick={() => { setEditingId(null); setFormData({ fecha: new Date().toISOString().split('T')[0], hora: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }), institucion: '', paciente: '', tipoCx: '', medico: '', valorBruto: '', deleted: false }); setView('form'); }} className="btn btn-primary btn-plus-float">
+          <Plus size={32} strokeWidth={3} />
+        </button>
+      )}
 
       <main className="container-fluid px-3 px-md-5 py-4 flex-grow-1">
         
-        {view === 'form' && (
+        {currentView === 'form' && (
           <div className="d-flex justify-content-center animate-fade py-2">
             <div className="card glass-card p-4 p-md-5 w-100 shadow-lg" style={{ maxWidth: '700px' }}>
               <div className="d-flex justify-content-between align-items-start mb-4">
@@ -485,17 +871,54 @@ export default function App() {
                   <input type="text" className="form-control" placeholder="Nombre completo" value={formData.paciente} onChange={e => setFormData({...formData, paciente: e.target.value})} required /></div>
                 <div className="col-12"><label className="form-label fw-bold text-contrast-fix small">CIRUGIA / PROCEDIMIENTO</label>
                   <input type="text" className="form-control" placeholder="Tipo de cirugia" value={formData.tipoCx} onChange={e => setFormData({...formData, tipoCx: e.target.value})} required /></div>
+                <div className="col-12">
+                  <label className="form-label fw-bold text-contrast-fix small d-flex justify-content-between align-items-center">
+                    MEDICO QUE OPERA
+                    <button type="button" className="btn btn-sm btn-outline-primary rounded-pill py-0 px-2" onClick={() => setShowMedicoManager(!showMedicoManager)}>
+                      <Pencil size={12} className="me-1" /> Gestionar Medicos
+                    </button>
+                  </label>
+                  <select className="form-select" value={formData.medico} onChange={e => setFormData({...formData, medico: e.target.value})} required>
+                    <option value="">Seleccionar medico...</option>
+                    {medicos.map((m, i) => <option key={i} value={m}>{m}</option>)}
+                  </select>
+                </div>
+                {showMedicoManager && (
+                  <div className="col-12">
+                    <div className="p-3 rounded-4 border" style={{ backgroundColor: 'var(--bg-card-alt)', borderColor: 'var(--border-color)' }}>
+                      <h6 className="fw-bold text-contrast-fix small mb-3"><Users size={16} className="me-2" />Gestionar Medicos</h6>
+                      <div className="d-flex gap-2 mb-3">
+                        <input type="text" className="form-control form-control-sm" placeholder="Nombre del medico" value={newMedico} onChange={e => setNewMedico(e.target.value)} />
+                        <button type="button" className="btn btn-sm btn-primary rounded-pill" onClick={addMedico}><Plus size={16} /></button>
+                      </div>
+                      <div className="list-group list-group-flush">
+                        {medicos.map((m, i) => (
+                          <div key={i} className="list-group-item d-flex justify-content-between align-items-center px-0 py-2" style={{ backgroundColor: 'transparent', borderColor: 'var(--border-color)' }}>
+                            <span className="small text-contrast-fix">{m}</span>
+                            {medicos.length > 1 && (
+                              <button type="button" className="btn btn-sm btn-outline-danger rounded-circle p-1" onClick={() => removeMedico(i)}><X size={14} /></button>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
                 <div className="col-12"><label className="form-label fw-bold text-contrast-fix small">INSTITUCION</label>
                   <input type="text" className="form-control" placeholder="Clinica o Hospital" value={formData.institucion} onChange={e => setFormData({...formData, institucion: e.target.value})} required /></div>
                 <div className="col-12"><label className="form-label fw-bold text-contrast-fix small">HONORARIOS BRUTOS ($)</label>
                   <input type="number" className="form-control fw-bold text-primary h4 py-3" value={formData.valorBruto} onChange={e => setFormData({...formData, valorBruto: e.target.value})} required /></div>
-                <div className="col-12 mt-4"><button type="submit" className="btn btn-primary w-100 p-3 rounded-pill fw-bold shadow-sm">{editingId ? 'Guardar Cambios' : 'Confirmar Registro'}</button></div>
+                <div className="col-12 mt-4"><button type="submit" className="btn btn-primary w-100 p-3 rounded-pill fw-bold shadow-sm" disabled={dbLoading}>{dbLoading ? <Loader2 size={20} className="spinner-border" /> : (editingId ? 'Guardar Cambios' : 'Confirmar Registro')}</button></div>
               </form>
             </div>
           </div>
         )}
 
-        {view === 'calendar' && (
+        {currentView === 'admin' && (
+          <AdminView records={allRecords} loading={dbLoading} onDelete={adminDelete} onRestore={adminRestore} />
+        )}
+
+        {currentView === 'calendar' && (
           <div className="animate-fade">
             <div className="d-flex flex-column flex-md-row justify-content-between align-items-center mb-4 gap-3">
               <h2 className="fw-bold m-0 text-contrast-fix">Agenda Quirurgica</h2>
@@ -583,7 +1006,7 @@ export default function App() {
                                 <span className="text-primary">${Number(r.valorBruto).toLocaleString()}</span>
                               </div>
                               <div className="text-contrast-fix fw-bold small">{r.paciente}</div>
-                              <div className="text-muted-fix x-small mt-1" style={{ fontSize: '11px' }}>{r.tipoCx} • {r.institucion}</div>
+                              <div className="text-muted-fix x-small mt-1" style={{ fontSize: '11px' }}>{r.tipoCx} • {r.medico || 'Sin medico'} • {r.institucion}</div>
                             </div>
                           ))
                         )}
@@ -596,7 +1019,7 @@ export default function App() {
           </div>
         )}
 
-        {view === 'dashboard' && (
+        {currentView === 'dashboard' && (
           <div className="animate-fade text-start">
             <div className="d-flex flex-column flex-md-row justify-content-between align-items-center mb-4 gap-3">
               <h2 className="fw-bold text-contrast-fix m-0">Analisis Financiero</h2>
@@ -663,7 +1086,7 @@ export default function App() {
                             <td className="text-start">${Number(r.valorBruto).toLocaleString()}</td>
                             <td className="text-end">
                               <button onClick={() => restoreRecord(r.id)} title="Restaurar" className="btn btn-sm btn-outline-success rounded-circle me-2"><RotateCcw size={14}/></button>
-                              <button onClick={() => hardDelete(r.id)} title="Eliminar Permanente" className="btn btn-sm btn-outline-danger rounded-circle"><Trash2 size={14}/></button>
+                              <button onClick={() => softDelete(r.id)} title="Eliminar Permanente" className="btn btn-sm btn-outline-danger rounded-circle"><Trash2 size={14}/></button>
                             </td>
                           </tr>
                         ))}
@@ -676,14 +1099,14 @@ export default function App() {
           </div>
         )}
 
-        {view === 'history' && (
+        {currentView === 'history' && (
           <div className="animate-fade text-start">
             <div className="d-flex flex-column flex-lg-row justify-content-between align-items-start align-items-lg-center mb-4 gap-3">
               <h2 className="fw-bold text-contrast-fix m-0">Historial</h2>
               <div className="d-flex flex-wrap gap-2 w-100 w-lg-auto">
                 <div className="position-relative flex-grow-1" style={{ minWidth: '250px' }}>
                   <Search className="position-absolute top-50 start-0 translate-middle-y ms-3" style={{ color: 'var(--text-muted)' }} size={18} />
-                  <input type="text" className="form-control ps-5 rounded-pill" placeholder="Buscar por paciente, clinica..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+                  <input type="text" className="form-control ps-5 rounded-pill" placeholder="Buscar por paciente, clinica, medico..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
                 </div>
                 <button onClick={() => { setSearchTerm(''); setDateRange({start:'', end:''}) }} className="btn rounded-pill fw-bold" style={{ backgroundColor: darkMode ? 'transparent' : 'var(--bg-card)', color: 'var(--text-muted)', borderColor: 'var(--border-color)', borderWidth: '1px', borderStyle: 'solid' }}>Limpiar</button>
               </div>
@@ -719,7 +1142,8 @@ export default function App() {
                             <span className="text-muted small">#{r.id.split('-')[1].slice(-4)}</span>
                           </div>
                           <h5 className="fw-bold text-contrast-fix mb-1 text-start">{r.paciente}</h5>
-                          <p className="text-primary small mb-3 fw-bold text-start">{r.tipoCx}</p>
+                          <p className="text-primary small mb-1 fw-bold text-start">{r.tipoCx}</p>
+                          {r.medico && <p className="text-info small mb-3 fw-bold text-start"><Stethoscope size={12} className="me-1"/>{r.medico}</p>}
                           <div className="p-3 rounded-4 mb-3" style={{ backgroundColor: darkMode ? 'rgba(108,117,125,0.1)' : 'var(--bg-card-alt)' }}>
                             <div className="d-flex justify-content-between small text-start"><span>Bruto:</span><span className="fw-bold text-contrast-fix">${f.bruto.toLocaleString()}</span></div>
                             <div className="d-flex justify-content-between small text-success fw-bold mt-1 text-start"><span>Neto ({(100 - TAX_RATE*100).toFixed(2)}%):</span><span>${f.liquido.toLocaleString(undefined, {maximumFractionDigits:0})}</span></div>
@@ -741,7 +1165,7 @@ export default function App() {
           </div>
         )}
 
-        {view === 'home' && (
+        {currentView === 'home' && (
           <div className="text-center py-5 animate-fade">
             <h1 className="display-4 fw-bold text-contrast-fix mb-3">Dra. <span className="text-primary">Maria Joaquina</span></h1>
             <p className="lead text-muted-fix mb-5">Gestion de Honorarios e Impuestos Quirurgicos.</p>
@@ -766,7 +1190,7 @@ export default function App() {
 
       <footer className="py-4 mt-auto border-top" style={{ backgroundColor: 'var(--bg-nav)', borderColor: darkMode ? 'var(--border-secondary)' : 'var(--navbar-border)' }}>
         <div className="container text-center">
-          <p className="small text-muted-fix mb-0 fw-bold opacity-75">SurgiTrack Pro Elite v9.2 • Dra. Maria Joaquina • Impuestos: {(TAX_RATE*100).toFixed(2)}%</p>
+          <p className="small text-muted-fix mb-0 fw-bold opacity-75">SurgiTrack Pro Elite v10.0 • Dra. Maria Joaquina • Impuestos: {(TAX_RATE*100).toFixed(2)}%</p>
         </div>
       </footer>
     </div>
