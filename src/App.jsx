@@ -149,7 +149,7 @@ const AuthScreen = ({ onLogin, darkMode }) => {
 
   return (
     <div className="min-vh-100 d-flex align-items-center justify-content-center" style={{ backgroundColor: 'var(--bg-primary)' }}>
-      <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet />
+      <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" />
       <div className="card glass-card p-4 p-md-5 shadow-lg" style={{ maxWidth: '420px', width: '90%' }}>
         <div className="text-center mb-4">
           <div className="bg-primary bg-gradient p-3 rounded-4 shadow-sm d-inline-block mb-3">
@@ -760,7 +760,7 @@ export default function App() {
 
   return (
     <div className="min-vh-100 d-flex flex-column" style={{ width: '100vw', overflowX: 'hidden', backgroundColor: 'var(--bg-primary)', color: 'var(--text-contrast)' }}>
-      <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet />
+      <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" />
       <style>{`
         body { font-family: 'Inter', sans-serif; background: var(--bg-primary); color: var(--text-contrast); }
         .text-contrast-fix { color: var(--text-contrast) !important; }
