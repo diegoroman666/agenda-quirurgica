@@ -1,1339 +1,1175 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { 
-  Plus,
-  Trash2, 
-  ClipboardList, 
-  Moon, 
-  Sun,
-  Edit3,
-  Clock,
-  Stethoscope,
-  ChevronLeft,
-  ChevronRight,
-  TrendingUp,
-  MapPin,
-  Calendar as CalendarIcon,
-  PieChart,
-  FileSpreadsheet,
-  FileText,
-  PlusCircle,
-  X,
-  Search,
-  Filter,
-  ArrowRight,
-  Receipt,
-  RotateCcw,
-  Settings,
-  Palette,
-  LogIn,
-  UserPlus,
-  LogOut,
-  User,
-  Shield,
-  Loader2,
-  Users,
-  Pencil,
-  Activity,
-  Scissors,
-  LocateFixed,
-  Building2
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import {
+  Eye, EyeOff, Calendar as CalendarIcon, LogIn, LogOut, User,
+  Palette, Sun, Moon, ZoomIn, Info, HelpCircle, X, Plus, Trash2,
+  RotateCcw, Calculator as CalcIcon, Download, FileSpreadsheet, FileText,
+  ChevronLeft, ChevronRight, Search, Filter, Edit3, Save, StickyNote,
+  Clock, Stethoscope, Building2, Scissors, Receipt, TrendingUp, Loader2
 } from 'lucide-react';
 import './App.css';
-import { supabase, isAdmin } from './supabase';
+import { supabase } from './supabase';
 
-const XLSX_SCRIPT_URL = "https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js";
-const JSPDF_SCRIPT_URL = "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js";
-const TAX_RATE = 0.1525;
+const TAX_RATE = 0.1525; // Retencion honorarios Chile 2026 (escalonado: 14.5% 2025, 15.25% 2026, 16% 2027)
 
 const DEFAULT_COLORS = {
   primary: '#0d6efd',
   secondary: '#6c757d',
   accent: '#17a2b8',
-  success: '#28a745'
+  success: '#28a745',
 };
 
-const COLOR_LABELS = {
-  primary: 'Primario',
-  secondary: 'Secundario',
-  accent: 'Acento',
-  success: 'Exito'
+const DEFAULT_TIPOS_CX = ['Laparoscopia', 'Artroscopia', 'Cirugia Abierta', 'Endoscopia', 'Microcirugia', 'Vanguard 360'];
+const DEFAULT_MEDICOS = ['Dr./Dra.'];
+const DEFAULT_INSTITUCIONES = ['Hospital San Fernando', 'Hospital Santacruz', 'Isamedica', 'Red Salud', 'Fusat'];
+
+const NOTE_COLORS = ['#fde68a', '#bbf7d0', '#bfdbfe', '#fecaca', '#e9d5ff', '#fed7aa'];
+const JORNADA_COLORS = {
+  ninguna: 'transparent',
+  parcial: '#fde68a',
+  completa: '#bfdbfe',
+  extendida: '#fecaca',
+  guardia: '#c7d2fe',
 };
 
-const DEFAULT_TIPOS_CX = ['Vanguard 360', 'Laparoscopia', 'Artroscopia', 'Cirugia Abierta', 'Cirugia Robotica', 'Endoscopia', 'Microcirugia'];
-const DEFAULT_TECNICAS = ['Minimamente Invasiva', 'Abierta', 'Asistida por Robot', 'Percutanea', 'Laser', 'Electrocirugia', 'Ultrasonido'];
-const DEFAULT_ZONAS_CUERPO = ['Cabeza', 'Cuello', 'Torax', 'Abdomen', 'Extremidad Superior Izquierda', 'Extremidad Superior Derecha', 'Extremidad Inferior Izquierda', 'Extremidad Inferior Derecha', 'Columna', 'Pelvis', 'Cara', 'Mano Izquierda', 'Mano Derecha', 'Pie Izquierdo', 'Pie Derecho', 'Rodilla Izquierda', 'Rodilla Derecha', 'Cadera Izquierda', 'Cadera Derecha', 'Hombro Izquierdo', 'Hombro Derecho'];
+const STORAGE = {
+  data: 'agenda-quirurgica-data-v1',
+  prefs: 'agenda-quirurgica-prefs-v1',
+};
 
-const SettingsPanel = ({ show, onClose, colors, setColors }) => {
-  const handleColorChange = (key, value) => {
-    const newColors = { ...colors, [key]: value };
-    setColors(newColors);
-    document.documentElement.style.setProperty(`--${key}-color`, value);
+// ---------- utils ----------
+const uid = () => `cx-${Date.now()}-${Math.floor(Math.random() * 9999)}`;
+const fmtMoney = (n) => `$${Number(n || 0).toLocaleString('es-CL', { maximumFractionDigits: 0 })}`;
+const pad2 = (n) => String(n).padStart(2, '0');
+const dateToStr = (d) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+const parseDate = (s) => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
+const calcFinance = (bruto) => {
+  const v = parseFloat(bruto) || 0;
+  const retencion = v * TAX_RATE;
+  return { bruto: v, retencion, liquido: v - retencion };
+};
+
+const loadData = () => {
+  try { return JSON.parse(localStorage.getItem(STORAGE.data)) || { records: [], notes: {}, jornadas: {} }; }
+  catch { return { records: [], notes: {}, jornadas: {} }; }
+};
+const saveData = (d) => localStorage.setItem(STORAGE.data, JSON.stringify(d));
+
+const loadPrefs = () => {
+  try { return JSON.parse(localStorage.getItem(STORAGE.prefs)) || {}; }
+  catch { return {}; }
+};
+const savePrefs = (p) => localStorage.setItem(STORAGE.prefs, JSON.stringify(p));
+
+// ---------- Eye Menu ----------
+function EyeMenu({ open, onClose, colors, setColors, theme, setTheme, zoom, setZoom, onShowAbout, onShowHelp }) {
+  const handleColor = (k, v) => {
+    const next = { ...colors, [k]: v };
+    setColors(next);
+    document.documentElement.style.setProperty(`--${k}-color`, v);
   };
-
-  const resetColors = () => {
-    setColors(DEFAULT_COLORS);
-    Object.entries(DEFAULT_COLORS).forEach(([key, value]) => {
-      document.documentElement.style.setProperty(`--${key}-color`, value);
-    });
-  };
-
   return (
     <>
-      {show && <div className="settings-backdrop" onClick={onClose} />}
-      <div className={`settings-drawer ${show ? 'open' : ''}`}>
-        <div className="d-flex justify-content-between align-items-center mb-1">
-          <h3 className="fw-bold m-0"><Palette size={20} className="me-2" />Personalizar</h3>
-          <button onClick={onClose} className="btn btn-sm p-1 border-0" style={{ color: 'var(--text-muted)' }}>
-            <X size={22} />
-          </button>
-        </div>
-        <p className="settings-subtitle">Ajusta la paleta de colores de la aplicacion</p>
-
-        <div className="color-preview-row">
-          {Object.values(colors).map((c, i) => (
-            <div key={i} className="color-preview-swatch" style={{ backgroundColor: c }} />
-          ))}
+      {open && <div className="eye-backdrop" onClick={onClose} />}
+      <div className={`eye-menu ${open ? 'open' : ''}`} role="dialog" aria-label="Menu principal">
+        <div className="eye-menu-header">
+          <h3>Menu</h3>
+          <button className="icon-btn" onClick={onClose} aria-label="Cerrar menu"><X size={18} /></button>
         </div>
 
-        <div className="settings-section-title">Colores principales</div>
-
-        {Object.entries(colors).map(([key, value]) => (
-          <div className="color-picker-group" key={key}>
-            <label>{COLOR_LABELS[key]}</label>
-            <div className="color-picker-row">
-              <input
-                type="color"
-                value={value}
-                onChange={e => handleColorChange(key, e.target.value)}
-              />
-              <span className="hex-value">{value.toUpperCase()}</span>
-            </div>
+        <section className="eye-section">
+          <div className="eye-section-title"><Palette size={14} /> Personalizar colores</div>
+          <div className="color-grid">
+            {Object.entries(colors).map(([k, v]) => (
+              <label key={k} className="color-cell">
+                <input type="color" value={v} onChange={(e) => handleColor(k, e.target.value)} />
+                <span>{k}</span>
+              </label>
+            ))}
           </div>
-        ))}
+          <button className="btn-ghost full" onClick={() => { setColors(DEFAULT_COLORS); Object.entries(DEFAULT_COLORS).forEach(([k, v]) => document.documentElement.style.setProperty(`--${k}-color`, v)); }}>
+            <RotateCcw size={14} /> Restaurar
+          </button>
+        </section>
 
-        <hr className="settings-divider" />
+        <section className="eye-section">
+          <div className="eye-section-title">Tema</div>
+          <div className="theme-toggle">
+            <button className={theme === 'light' ? 'active' : ''} onClick={() => setTheme('light')}><Sun size={16} /> Claro</button>
+            <button className={theme === 'dark' ? 'active' : ''} onClick={() => setTheme('dark')}><Moon size={16} /> Oscuro</button>
+          </div>
+        </section>
 
-        <button
-          onClick={resetColors}
-          className="btn btn-outline-secondary w-100 rounded-pill fw-bold py-2"
-        >
-          <RotateCcw size={16} className="me-2" />Restaurar valores predeterminados
-        </button>
+        <section className="eye-section">
+          <div className="eye-section-title"><ZoomIn size={14} /> Zoom: {Math.round(zoom * 100)}%</div>
+          <input type="range" min="0.7" max="1.5" step="0.05" value={zoom} onChange={(e) => setZoom(parseFloat(e.target.value))} className="zoom-range" />
+          <div className="zoom-quick">
+            <button onClick={() => setZoom(0.85)}>85%</button>
+            <button onClick={() => setZoom(1)}>100%</button>
+            <button onClick={() => setZoom(1.15)}>115%</button>
+            <button onClick={() => setZoom(1.3)}>130%</button>
+          </div>
+        </section>
+
+        <section className="eye-section">
+          <button className="btn-ghost full" onClick={onShowHelp}><HelpCircle size={16} /> Como se usa la app</button>
+          <button className="btn-ghost full" onClick={onShowAbout}><Info size={16} /> Acerca de</button>
+        </section>
+
+        <footer className="eye-footer">
+          <small>Agenda Quirurgica</small>
+          <small>Hecho por Diego Roman</small>
+          <small>IEI-IA &copy; 2026</small>
+        </footer>
       </div>
     </>
   );
-};
+}
 
-const AuthScreen = ({ onLogin, darkMode }) => {
-  const [isLogin, setIsLogin] = useState(true);
+// ---------- Login dropdown ----------
+function LoginDropdown({ open, onClose, user, onLogout, onGoogle, onEmailLogin, loading, error }) {
+  const [mode, setMode] = useState('main'); // main | email
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError('');
-    setLoading(true);
+  useEffect(() => { if (!open) { setMode('main'); setEmail(''); setPassword(''); } }, [open]);
 
-    try {
-      if (isLogin) {
-        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw error;
-        onLogin(data.user);
-      } else {
-        const { data, error } = await supabase.auth.signUp({ email, password });
-        if (error) throw error;
-        if (data.user) {
-          onLogin(data.user);
-        }
-      }
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
+  if (!open) return null;
   return (
-    <div className="auth-container min-vh-100 d-flex align-items-center justify-content-center">
-      <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" />
-      <div className="auth-card card glass-card p-4 p-md-5 shadow-lg">
-        <div className="text-center mb-4">
-          <div className="auth-logo-bg p-3 rounded-4 shadow-sm d-inline-block mb-3">
-            <Stethoscope className="text-white" size={32} />
-          </div>
-          <h2 className="fw-bold text-contrast-fix m-0">SurgiTask <span className="text-primary">Pro</span></h2>
-          <p className="text-muted-fix small">Planner Profesional</p>
-        </div>
-
-        {error && (
-          <div className="alert alert-danger py-2 small">{error}</div>
-        )}
-
-        <form onSubmit={handleSubmit}>
-          <div className="mb-3">
-            <label className="form-label fw-bold text-contrast-fix small">EMAIL</label>
-            <input type="email" className="form-control" value={email} onChange={e => setEmail(e.target.value)} required placeholder="tu@email.com" />
-          </div>
-          <div className="mb-4">
-            <label className="form-label fw-bold text-contrast-fix small">CONTRASENA</label>
-            <input type="password" className="form-control" value={password} onChange={e => setPassword(e.target.value)} required placeholder="Minimo 6 caracteres" minLength={6} />
-          </div>
-          <button type="submit" className="btn btn-primary w-100 p-3 rounded-pill fw-bold shadow-sm" disabled={loading}>
-            {loading ? <Loader2 size={20} className="spinner-border" /> : (
-              <>
-                {isLogin ? <LogIn size={18} className="me-2" /> : <UserPlus size={18} className="me-2" />}
-                {isLogin ? 'Iniciar Sesion' : 'Registrarse'}
-              </>
-            )}
-          </button>
-        </form>
-
-        <div className="text-center mt-4">
-          <button className="btn btn-link text-decoration-none small" onClick={() => { setIsLogin(!isLogin); setError(''); }}>
-            {isLogin ? 'No tienes cuenta? Registrate' : 'Ya tienes cuenta? Inicia sesion'}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-const Navbar = ({ view, setView, darkMode, setDarkMode, onOpenSettings, user, onLogout, adminView }) => (
-  <nav className="navbar sticky-top px-2 py-2 px-md-3 py-md-3" 
-       style={{ backdropFilter: 'blur(20px)', backgroundColor: 'var(--navbar-bg)', borderColor: 'var(--navbar-border)', zIndex: 1050 }}>
-    <div className="container-fluid flex-nowrap">
-      <div className="d-flex align-items-center gap-2 gap-md-3" onClick={() => setView(adminView ? 'admin' : 'home')} style={{ cursor: 'pointer' }}>
-        <div className="navbar-logo-bg p-2 rounded-4 shadow-sm">
-          <Stethoscope className="text-white" size={20} />
-        </div>
-        <div className="d-flex flex-column d-none d-sm-flex">
-          <span className="fw-bold h6 mb-0 text-primary" style={{ letterSpacing: '-0.5px' }}>SurgiTask <span className="text-info">Pro</span></span>
-          <small className="fw-bold text-uppercase" style={{ fontSize: '8px', opacity: 0.8, color: 'var(--text-contrast)' }}>Planner Profesional</small>
-        </div>
-      </div>
-
-      <div className="d-flex align-items-center gap-1 gap-md-2">
-        {!adminView && (
+    <>
+      <div className="login-backdrop" onClick={onClose} />
+      <div className="login-pop">
+        {user ? (
           <>
-            <button onClick={() => setView('form')} className="btn btn-primary btn-sm rounded-pill px-3 fw-bold d-flex align-items-center gap-1 me-2 shadow-sm">
-              <PlusCircle size={18} /> <span className="d-none d-md-inline">Nueva Cx</span>
-            </button>
-            
-            <div className="nav-toggle-group d-flex p-1 rounded-4 border">
-              <button onClick={() => setView('dashboard')} className={`btn btn-sm px-2 px-md-3 rounded-pill fw-bold ${view === 'dashboard' ? 'btn-primary shadow-sm text-white' : 'border-0'}`} style={{ color: view !== 'dashboard' ? 'var(--text-muted)' : undefined }}>
-                <TrendingUp size={16} className="d-md-none"/> <span className="d-none d-md-inline">Analisis</span>
-              </button>
-              <button onClick={() => setView('calendar')} className={`btn btn-sm px-2 px-md-3 rounded-pill fw-bold ${view === 'calendar' ? 'btn-primary shadow-sm text-white' : 'border-0'}`} style={{ color: view !== 'calendar' ? 'var(--text-muted)' : undefined }}>
-                <CalendarIcon size={16} className="d-md-none"/> <span className="d-none d-md-inline">Agenda</span>
-              </button>
-              <button onClick={() => setView('history')} className={`btn btn-sm px-2 px-md-3 rounded-pill fw-bold ${view === 'history' ? 'btn-primary shadow-sm text-white' : 'border-0'}`} style={{ color: view !== 'history' ? 'var(--text-muted)' : undefined }}>
-                <ClipboardList size={16} className="d-md-none"/> <span className="d-none d-md-inline">Registros</span>
-              </button>
+            <div className="login-head">
+              <div className="login-avatar"><User size={18} /></div>
+              <div>
+                <div className="login-name">{user.email}</div>
+                <small>Sesion activa</small>
+              </div>
             </div>
+            <button className="btn-danger full" onClick={onLogout}><LogOut size={16} /> Cerrar sesion</button>
+          </>
+        ) : mode === 'main' ? (
+          <>
+            <h4>Iniciar sesion</h4>
+            <p className="muted small">Vincular con tu cuenta Google es la opcion mas segura (OAuth, sin contrasena local).</p>
+            <button className="btn-google full" onClick={onGoogle} disabled={loading}>
+              <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3c-1.6 4.6-6 8-11.3 8-6.6 0-12-5.4-12-12s5.4-12 12-12c3 0 5.8 1.1 7.9 3l5.7-5.7C34 5.1 29.3 3 24 3 12.4 3 3 12.4 3 24s9.4 21 21 21 21-9.4 21-21c0-1.2-.1-2.3-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 16 19 13 24 13c3 0 5.8 1.1 7.9 3l5.7-5.7C34 5.1 29.3 3 24 3 16.3 3 9.6 7.5 6.3 14.7z"/><path fill="#4CAF50" d="M24 45c5.2 0 9.9-2 13.4-5.2l-6.2-5.2c-2 1.4-4.5 2.4-7.2 2.4-5.3 0-9.7-3.4-11.3-8l-6.5 5C9.5 40.5 16.2 45 24 45z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4-4 5.3l6.2 5.2c-.4.4 6.5-4.7 6.5-14.5 0-1.2-.1-2.3-.4-3.5z"/></svg>
+              Continuar con Google
+            </button>
+            <div className="divider"><span>o</span></div>
+            <button className="btn-ghost full" onClick={() => setMode('email')}>Iniciar con correo y contrasena</button>
+            {error && <div className="alert-err">{error}</div>}
+            <p className="muted xs">Tu sesion queda protegida por Supabase Auth (cifrado JWT + cookies httpOnly).</p>
+          </>
+        ) : (
+          <>
+            <h4>Acceso con correo</h4>
+            <form onSubmit={(e) => { e.preventDefault(); onEmailLogin(email, password); }}>
+              <input className="input" type="email" required placeholder="correo@dominio.com" value={email} onChange={(e) => setEmail(e.target.value)} />
+              <input className="input" type="password" required minLength={6} placeholder="Contrasena (min 6)" value={password} onChange={(e) => setPassword(e.target.value)} />
+              <button className="btn-primary full" disabled={loading}>{loading ? <Loader2 size={16} className="spin" /> : <><LogIn size={16} /> Entrar / Registrar</>}</button>
+            </form>
+            {error && <div className="alert-err">{error}</div>}
+            <button className="btn-ghost full" onClick={() => setMode('main')}>Volver</button>
           </>
         )}
-        
-        {isAdmin(user) && (
-          <button onClick={() => setView(adminView ? 'home' : 'admin')} className={`btn btn-sm rounded-pill fw-bold px-3 ${adminView ? 'btn-warning' : 'btn-outline-warning'}`}>
-            <Shield size={16} className="me-1" /> {adminView ? 'Volver' : 'Admin'}
-          </button>
-        )}
+      </div>
+    </>
+  );
+}
 
-        <button onClick={onOpenSettings} className="btn border-0 p-2 rounded-circle" style={{ color: 'var(--text-muted)' }} title="Personalizar colores">
-          <Settings size={20} />
-        </button>
-
-        <button onClick={() => setDarkMode(!darkMode)} className={`btn border-0 p-2 rounded-circle ${darkMode ? 'text-warning' : 'text-secondary'}`}>
-          {darkMode ? <Sun size={20} /> : <Moon size={20} />}
-        </button>
-
-        <div className="dropdown">
-          <button className="btn border-0 p-2 rounded-circle" style={{ color: 'var(--text-muted)' }} data-bs-toggle="dropdown">
-            <User size={20} />
-          </button>
-          <ul className="dropdown-menu dropdown-menu-end">
-            <li><span className="dropdown-item-text small fw-bold text-truncate" style={{ maxWidth: '200px' }}>{user.email}</span></li>
-            <li><hr className="dropdown-divider" /></li>
-            <li><button className="dropdown-item text-danger" onClick={onLogout}><LogOut size={16} className="me-2" />Cerrar Sesion</button></li>
-          </ul>
+// ---------- Navbar ----------
+function Navbar({ eyeOpen, toggleEye, onGotoAgenda, loginOpen, toggleLogin, user }) {
+  return (
+    <header className="navbar">
+      <div className="nav-left">
+        <div className="logo-mark"><Stethoscope size={20} /></div>
+        <div className="logo-text">
+          <strong>Agenda</strong>
+          <span>Quirurgica</span>
         </div>
       </div>
-    </div>
-  </nav>
-);
 
-const AdminView = ({ records, loading, onDelete, onRestore }) => {
-  const [searchTerm, setSearchTerm] = useState('');
+      <button className={`eye-btn ${eyeOpen ? 'closed' : ''}`} onClick={toggleEye} aria-label="Menu" title="Menu principal">
+        {eyeOpen ? <EyeOff size={22} /> : <Eye size={22} />}
+      </button>
 
-  const filteredRecords = useMemo(() => {
-    return records.filter(r => {
-      const term = searchTerm.toLowerCase();
-      return (
-        r.paciente?.toLowerCase().includes(term) ||
-        r.tipoCx?.toLowerCase().includes(term) ||
-        r.institucion?.toLowerCase().includes(term) ||
-        r.medico?.toLowerCase().includes(term)
-      );
-    });
-  }, [records, searchTerm]);
-
-  if (loading) {
-    return (
-      <div className="text-center py-5">
-        <Loader2 size={40} className="spinner-border text-primary" />
-        <p className="text-muted-fix mt-3">Cargando todas las cirugias...</p>
+      <div className="nav-right">
+        <button className="nav-action" onClick={onGotoAgenda} title="Ir a la agenda">
+          <CalendarIcon size={16} /> <span>Agenda</span>
+        </button>
+        <button className={`nav-action ${loginOpen ? 'active' : ''}`} onClick={toggleLogin} title="Iniciar sesion">
+          {user ? <User size={16} /> : <LogIn size={16} />}
+          <span className="d-hide-sm">{user ? 'Cuenta' : 'Iniciar sesion'}</span>
+        </button>
       </div>
-    );
-  }
+    </header>
+  );
+}
+
+// ---------- Flip Card ----------
+function FlipCard({ flipped, front, back, className = '' }) {
+  return (
+    <div className={`flip-card ${className} ${flipped ? 'is-flipped' : ''}`}>
+      <div className="flip-inner">
+        <div className="flip-face flip-front">{front}</div>
+        <div className="flip-face flip-back">{back}</div>
+      </div>
+    </div>
+  );
+}
+
+// ---------- Registration Form ----------
+function RegistroForm({ data, setData, onCancel, onSubmit, tiposCx, setTiposCx, medicos, setMedicos, instituciones, setInstituciones, editingId }) {
+  const update = (k, v) => setData((p) => ({ ...p, [k]: v }));
+  const addOption = (list, setList, val) => {
+    const t = (val || '').trim();
+    if (t && !list.includes(t)) setList([...list, t]);
+  };
 
   return (
-    <div className="animate-fade text-start">
-      <div className="d-flex flex-column flex-lg-row justify-content-between align-items-start align-items-lg-center mb-4 gap-3">
+    <form className="reg-form" onSubmit={(e) => { e.preventDefault(); onSubmit(); }}>
+      <div className="reg-form-head">
+        <h3>{editingId ? 'Editar cirugia' : 'Nuevo registro'}</h3>
+        <button type="button" className="icon-btn" onClick={onCancel}><X size={18} /></button>
+      </div>
+
+      <div className="reg-grid">
         <div>
-          <h2 className="fw-bold text-contrast-fix m-0"><Shield size={28} className="me-2 text-warning" />Panel de Administrador</h2>
-          <p className="text-muted-fix small">Todas las cirugias registradas por todos los usuarios</p>
+          <label>Fecha</label>
+          <input className="input" type="date" required value={data.fecha} onChange={(e) => update('fecha', e.target.value)} />
         </div>
-        <div className="position-relative flex-grow-1" style={{ maxWidth: '350px' }}>
-          <Search className="position-absolute top-50 start-0 translate-middle-y ms-3" style={{ color: 'var(--text-muted)' }} size={18} />
-          <input type="text" className="form-control ps-5 rounded-pill" placeholder="Buscar..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+        <div>
+          <label>Hora inicio</label>
+          <input className="input" type="time" required value={data.hora} onChange={(e) => update('hora', e.target.value)} />
+        </div>
+        <div className="col2">
+          <label>Paciente</label>
+          <input className="input" required placeholder="Nombre completo" value={data.paciente} onChange={(e) => update('paciente', e.target.value)} />
+        </div>
+        <div>
+          <label>Edad</label>
+          <input className="input" type="number" min="0" max="120" value={data.edad} onChange={(e) => update('edad', e.target.value)} />
+        </div>
+        <div>
+          <label>Sexo</label>
+          <select className="input" value={data.sexo} onChange={(e) => update('sexo', e.target.value)}>
+            <option value="">Seleccionar</option>
+            <option>Femenino</option>
+            <option>Masculino</option>
+            <option>Otro</option>
+          </select>
+        </div>
+        <div className="col2">
+          <label>Tipo de cirugia</label>
+          <div className="input-add">
+            <select className="input" required value={data.tipoCx} onChange={(e) => update('tipoCx', e.target.value)}>
+              <option value="">Seleccionar...</option>
+              {tiposCx.map((t) => <option key={t}>{t}</option>)}
+            </select>
+            <button type="button" className="icon-btn" title="Agregar tipo" onClick={() => {
+              const v = prompt('Nuevo tipo de cirugia:'); addOption(tiposCx, setTiposCx, v);
+            }}><Plus size={14} /></button>
+          </div>
+        </div>
+        <div className="col2">
+          <label>Cirujano</label>
+          <div className="input-add">
+            <select className="input" required value={data.medico} onChange={(e) => update('medico', e.target.value)}>
+              <option value="">Seleccionar...</option>
+              {medicos.map((m) => <option key={m}>{m}</option>)}
+            </select>
+            <button type="button" className="icon-btn" title="Agregar cirujano" onClick={() => {
+              const v = prompt('Nombre del cirujano:'); addOption(medicos, setMedicos, v);
+            }}><Plus size={14} /></button>
+          </div>
+        </div>
+        <div className="col2">
+          <label>Institucion / Clinica</label>
+          <div className="input-add">
+            <select className="input" required value={data.institucion} onChange={(e) => update('institucion', e.target.value)}>
+              <option value="">Seleccionar...</option>
+              {instituciones.map((i) => <option key={i}>{i}</option>)}
+            </select>
+            <button type="button" className="icon-btn" title="Agregar institucion" onClick={() => {
+              const v = prompt('Nombre de la institucion:'); addOption(instituciones, setInstituciones, v);
+            }}><Plus size={14} /></button>
+          </div>
+        </div>
+        <div className="col2">
+          <label>Honorarios brutos ($)</label>
+          <input className="input bold" type="number" min="0" required value={data.valorBruto} onChange={(e) => update('valorBruto', e.target.value)} />
+          {data.valorBruto && (
+            <div className="finance-preview">
+              <span>Retencion {(TAX_RATE * 100).toFixed(2)}%: <b>{fmtMoney(calcFinance(data.valorBruto).retencion)}</b></span>
+              <span>Liquido: <b className="text-success">{fmtMoney(calcFinance(data.valorBruto).liquido)}</b></span>
+            </div>
+          )}
+        </div>
+        <div className="col2">
+          <label>Observaciones</label>
+          <textarea className="input" rows="2" placeholder="Notas opcionales..." value={data.obs} onChange={(e) => update('obs', e.target.value)} />
         </div>
       </div>
 
-      <div className="glass-card p-3 p-md-4 shadow-sm">
-        <div className="d-flex justify-content-between align-items-center mb-3">
-          <span className="badge bg-warning rounded-pill px-3">{filteredRecords.length} registros totales</span>
-        </div>
-
-        {filteredRecords.length === 0 ? (
-          <div className="text-center py-5">
-            <ClipboardList size={60} className="text-muted opacity-25 mb-3" />
-            <p className="text-muted-fix h5">No hay registros.</p>
-          </div>
-        ) : (
-          <div className="table-responsive">
-            <table className={`table table-hover align-middle mb-0`} style={{ color: 'var(--text-contrast)' }}>
-              <thead>
-                <tr className="small text-muted">
-                  <th>USUARIO</th>
-                  <th>FECHA</th>
-                  <th>HORA</th>
-                  <th>PACIENTE</th>
-                  <th>CIRUGIA</th>
-                  <th>TECNICA</th>
-                  <th>ZONA</th>
-                  <th>MEDICO</th>
-                  <th>INSTITUCION</th>
-                  <th>HONORARIOS</th>
-                  <th className="text-end">ACCIONES</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredRecords.map(r => (
-                  <tr key={r.id} className={r.deleted ? 'opacity-50' : ''}>
-                    <td className="small text-muted-fix">{r.user_email || 'N/A'}</td>
-                    <td>{r.fecha}</td>
-                    <td>{r.hora}</td>
-                    <td className="fw-bold">{r.paciente}</td>
-                    <td>{r.tipoCx}</td>
-                    <td><span className="badge bg-info bg-opacity-10 text-info">{r.tecnica || 'N/A'}</span></td>
-                    <td><span className="badge bg-secondary bg-opacity-10 text-secondary">{r.zonaCuerpo || 'N/A'}</span></td>
-                    <td><span className="badge bg-info bg-opacity-10 text-info">{r.medico || 'N/A'}</span></td>
-                    <td>{r.institucion}</td>
-                    <td className="fw-bold text-primary">${Number(r.valorBruto || 0).toLocaleString()}</td>
-                    <td className="text-end">
-                      {r.deleted ? (
-                        <button onClick={() => onRestore(r.id)} title="Restaurar" className="btn btn-sm btn-outline-success rounded-circle"><RotateCcw size={14}/></button>
-                      ) : (
-                        <button onClick={() => onDelete(r.id)} title="Eliminar" className="btn btn-sm btn-outline-danger rounded-circle"><Trash2 size={14}/></button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+      <div className="reg-actions">
+        <button type="button" className="btn-ghost" onClick={onCancel}>Cancelar</button>
+        <button type="submit" className="btn-primary"><Save size={16} /> {editingId ? 'Guardar' : 'Registrar'}</button>
       </div>
-    </div>
+    </form>
   );
-};
+}
 
-const ManagerPanel = ({ title, icon: Icon, items, setItems, storageKey }) => {
-  const [newItem, setNewItem] = useState('');
+// ---------- Day Detail Modal ----------
+function DayModal({ dateStr, records, notes, jornada, onClose, onDelete, onRestore, onEdit, onAddNote, onUpdateNote, onSetJornada, onAdd }) {
+  const finance = useMemo(() => {
+    const active = records.filter((r) => !r.deleted);
+    const bruto = active.reduce((a, c) => a + (parseFloat(c.valorBruto) || 0), 0);
+    return { bruto, retencion: bruto * TAX_RATE, liquido: bruto * (1 - TAX_RATE), count: active.length };
+  }, [records]);
 
-  const addItem = () => {
-    if (newItem.trim() && !items.includes(newItem.trim())) {
-      const updated = [...items, newItem.trim()];
-      setItems(updated);
-      localStorage.setItem(storageKey, JSON.stringify(updated));
-      setNewItem('');
-    }
-  };
+  const [noteText, setNoteText] = useState('');
+  const [noteColor, setNoteColor] = useState(NOTE_COLORS[0]);
 
-  const removeItem = (index) => {
-    if (items.length > 1) {
-      const updated = items.filter((_, i) => i !== index);
-      setItems(updated);
-      localStorage.setItem(storageKey, JSON.stringify(updated));
-    }
-  };
+  const date = parseDate(dateStr);
+  const dateLabel = date.toLocaleDateString('es-CL', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 
   return (
-    <div className="manager-panel p-3 rounded-4 border">
-      <h6 className="fw-bold text-contrast-fix small mb-3"><Icon size={16} className="me-2" />{title}</h6>
-      <div className="d-flex gap-2 mb-3">
-        <input type="text" className="form-control form-control-sm" placeholder="Nuevo item..." value={newItem} onChange={e => setNewItem(e.target.value)} />
-        <button type="button" className="btn btn-sm btn-primary rounded-pill" onClick={addItem}><Plus size={16} /></button>
-      </div>
-      <div className="manager-list" style={{ maxHeight: '150px', overflowY: 'auto' }}>
-        {items.map((item, i) => (
-          <div key={i} className="manager-list-item d-flex justify-content-between align-items-center px-2 py-2">
-            <span className="small text-contrast-fix">{item}</span>
-            {items.length > 1 && (
-              <button type="button" className="btn btn-sm btn-outline-danger rounded-circle p-1" onClick={() => removeItem(i)}><X size={14} /></button>
-            )}
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-head">
+          <div>
+            <h3>{dateLabel}</h3>
+            <small className="muted">{finance.count} cirugia(s)</small>
           </div>
-        ))}
+          <button className="icon-btn" onClick={onClose}><X size={18} /></button>
+        </div>
+
+        <div className="modal-finance">
+          <div><span>Bruto</span><b>{fmtMoney(finance.bruto)}</b></div>
+          <div className="neg"><span>Retencion {(TAX_RATE * 100).toFixed(2)}%</span><b>-{fmtMoney(finance.retencion)}</b></div>
+          <div className="pos"><span>Liquido del dia</span><b>{fmtMoney(finance.liquido)}</b></div>
+        </div>
+
+        <div className="jornada-row">
+          <span>Tipo de jornada:</span>
+          {Object.keys(JORNADA_COLORS).map((k) => (
+            <button key={k} className={`jornada-chip ${jornada === k ? 'active' : ''}`}
+              style={{ background: JORNADA_COLORS[k], color: k === 'ninguna' ? 'inherit' : '#1a1a1a' }}
+              onClick={() => onSetJornada(dateStr, k)}>{k}</button>
+          ))}
+        </div>
+
+        <div className="modal-section">
+          <div className="modal-section-head">
+            <h4>Cirugias del dia</h4>
+            <button className="btn-primary sm" onClick={() => onAdd(dateStr)}><Plus size={14} /> Agregar</button>
+          </div>
+          {records.length === 0 ? (
+            <p className="muted center">Sin registros este dia.</p>
+          ) : (
+            <ul className="day-records">
+              {records.map((r) => (
+                <li key={r.id} className={r.deleted ? 'deleted' : ''}>
+                  <div className="rec-time"><Clock size={12} /> {r.hora}</div>
+                  <div className="rec-main">
+                    <b>{r.paciente}</b>
+                    <small>{r.tipoCx} · {r.medico} · {r.institucion}</small>
+                  </div>
+                  <div className="rec-money">{fmtMoney(r.valorBruto)}</div>
+                  <div className="rec-actions">
+                    {!r.deleted && <button className="icon-btn" title="Editar" onClick={() => onEdit(r)}><Edit3 size={14} /></button>}
+                    {r.deleted ? (
+                      <button className="icon-btn ok" title="Restaurar" onClick={() => onRestore(r.id)}><RotateCcw size={14} /></button>
+                    ) : (
+                      <button className="icon-btn danger" title="Eliminar" onClick={() => onDelete(r.id)}><Trash2 size={14} /></button>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        <div className="modal-section">
+          <div className="modal-section-head">
+            <h4><StickyNote size={14} /> Notas</h4>
+          </div>
+          <div className="note-input">
+            <input className="input" placeholder="Escribe una nota..." value={noteText} onChange={(e) => setNoteText(e.target.value)} />
+            <div className="note-colors">
+              {NOTE_COLORS.map((c) => (
+                <button key={c} className={`note-color ${noteColor === c ? 'active' : ''}`}
+                  style={{ background: c }} onClick={() => setNoteColor(c)} type="button" />
+              ))}
+            </div>
+            <button className="btn-primary sm" onClick={() => {
+              if (noteText.trim()) { onAddNote(dateStr, { id: uid(), text: noteText.trim(), color: noteColor }); setNoteText(''); }
+            }}><Plus size={14} /></button>
+          </div>
+          <div className="notes-list">
+            {(notes || []).map((n) => (
+              <div key={n.id} className="note" style={{ background: n.color }}>
+                <span>{n.text}</span>
+                <button className="icon-btn xs" onClick={() => onUpdateNote(dateStr, n.id, null)}><X size={12} /></button>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   );
+}
+
+// ---------- About / Help modals ----------
+function InfoModal({ title, onClose, children }) {
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal-card sm" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-head">
+          <h3>{title}</h3>
+          <button className="icon-btn" onClick={onClose}><X size={18} /></button>
+        </div>
+        <div className="modal-body">{children}</div>
+      </div>
+    </div>
+  );
+}
+
+// ---------- Calculator ----------
+// Safe expression evaluator (no eval) - supports + - * / and decimals
+const safeEval = (expr) => {
+  const cleaned = expr.replace(/×/g, '*').replace(/÷/g, '/').replace(/\s/g, '');
+  if (!/^-?\d+(\.\d+)?([+\-*/]-?\d+(\.\d+)?)*$/.test(cleaned)) throw new Error('bad');
+  const tokens = cleaned.match(/-?\d+(\.\d+)?|[+\-*/]/g) || [];
+  // pass 1: * and /
+  const mid = [];
+  for (let i = 0; i < tokens.length; i++) {
+    const t = tokens[i];
+    if (t === '*' || t === '/') {
+      const a = parseFloat(mid.pop()), b = parseFloat(tokens[++i]);
+      mid.push(t === '*' ? a * b : a / b);
+    } else mid.push(t);
+  }
+  // pass 2: + and -
+  let acc = parseFloat(mid[0]);
+  for (let i = 1; i < mid.length; i += 2) {
+    const op = mid[i], b = parseFloat(mid[i + 1]);
+    acc = op === '+' ? acc + b : acc - b;
+  }
+  return acc;
 };
 
-export default function App() {
-  const [darkMode, setDarkMode] = useState(() => {
-    const saved = localStorage.getItem('surgitrack-dark');
-    if (saved !== null) return saved === 'true';
-    return window.matchMedia('(prefers-color-scheme: dark)').matches;
-  });
-
-  const [colors, setColors] = useState(() => {
-    const saved = localStorage.getItem('surgitrack-colors');
-    if (saved) {
-      try { return { ...DEFAULT_COLORS, ...JSON.parse(saved) }; } catch { return { ...DEFAULT_COLORS }; }
-    }
-    return { ...DEFAULT_COLORS };
-  });
-
-  const [showSettings, setShowSettings] = useState(false);
-  const [view, setView] = useState('home'); 
-  const [editingId, setEditingId] = useState(null);
-  
-  const [currentCalDate, setCurrentCalDate] = useState(new Date());
-  const [selectedAnalysisDate, setSelectedAnalysisDate] = useState(new Date());
-  const [selectedDayRecords, setSelectedDayRecords] = useState(null);
-  
-  const [searchTerm, setSearchTerm] = useState('');
-  const [dateRange, setDateRange] = useState({ start: '', end: '' });
-
-  const [user, setUser] = useState(null);
-  const [authLoading, setAuthLoading] = useState(true);
-  const [dbLoading, setDbLoading] = useState(false);
-  const [adminView, setAdminView] = useState(false);
-  const [allRecords, setAllRecords] = useState([]);
-
-  const [medicos, setMedicos] = useState(() => {
-    const saved = localStorage.getItem('surgitrack-medicos');
-    return saved ? JSON.parse(saved) : ['Dr./Dra.'];
-  });
-  const [showMedicoManager, setShowMedicoManager] = useState(false);
-
-  const [tiposCx, setTiposCx] = useState(() => {
-    const saved = localStorage.getItem('surgitrack-tipos-cx');
-    return saved ? JSON.parse(saved) : DEFAULT_TIPOS_CX;
-  });
-  const [showTipoCxManager, setShowTipoCxManager] = useState(false);
-
-  const [tecnicas, setTecnicas] = useState(() => {
-    const saved = localStorage.getItem('surgitrack-tecnicas');
-    return saved ? JSON.parse(saved) : DEFAULT_TECNICAS;
-  });
-  const [showTecnicaManager, setShowTecnicaManager] = useState(false);
-
-  const [zonasCuerpo, setZonasCuerpo] = useState(() => {
-    const saved = localStorage.getItem('surgitrack-zonas-cuerpo');
-    return saved ? JSON.parse(saved) : DEFAULT_ZONAS_CUERPO;
-  });
-  const [showZonaCuerpoManager, setShowZonaCuerpoManager] = useState(false);
-
-  const [instituciones, setInstituciones] = useState(() => {
-    const saved = localStorage.getItem('surgitrack-instituciones');
-    return saved ? JSON.parse(saved) : ['Dr. Franco Ravera Zunino', 'Isamedica', 'Hospital San Fernando', 'Hospital Santacruz', 'Red Salud', 'Cleber', 'Fusat'];
-  });
-  const [showInstitucionManager, setShowInstitucionManager] = useState(false);
-
-  const [records, setRecords] = useState([]);
-
-  const [formData, setFormData] = useState({
-    fecha: new Date().toISOString().split('T')[0],
-    hora: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }),
-    institucion: '',
-    paciente: '',
-    tipoCx: '',
-    medico: '',
-    tecnica: '',
-    zonaCuerpo: '',
-    valorBruto: '',
-    deleted: false
-  });
-
-  useEffect(() => {
-    const initAuth = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) {
-        setUser(session.user);
-      }
-      setAuthLoading(false);
-    };
-    initAuth();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user || null);
-      setAdminView(false);
-      if (!session?.user) {
-        setView('home');
-      }
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
-
-  useEffect(() => {
-    if (user) {
-      fetchRecords();
-    }
-  }, [user]);
-
-  useEffect(() => {
-    localStorage.setItem('surgitrack-medicos', JSON.stringify(medicos));
-  }, [medicos]);
-
-  useEffect(() => {
-    localStorage.setItem('surgitrack-tipos-cx', JSON.stringify(tiposCx));
-  }, [tiposCx]);
-
-  useEffect(() => {
-    localStorage.setItem('surgitrack-tecnicas', JSON.stringify(tecnicas));
-  }, [tecnicas]);
-
-  useEffect(() => {
-    localStorage.setItem('surgitrack-zonas-cuerpo', JSON.stringify(zonasCuerpo));
-  }, [zonasCuerpo]);
-
-  const fetchRecords = async () => {
-    setDbLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from('cirugias')
-        .select('*')
-        .order('fecha', { ascending: false });
-      
-      if (error) throw error;
-      setRecords(data || []);
-    } catch (err) {
-      console.error('Error fetching records:', err);
-    } finally {
-      setDbLoading(false);
-    }
+function CalculatorModal({ onClose }) {
+  const [v, setV] = useState('0');
+  const press = (k) => {
+    if (k === 'C') return setV('0');
+    if (k === '=') { try { setV(String(safeEval(v))); } catch { setV('Error'); } return; }
+    if (k === '←') return setV(v.length > 1 ? v.slice(0, -1) : '0');
+    setV(v === '0' ? String(k) : v + k);
   };
+  const keys = ['C', '←', '÷', '×', '7', '8', '9', '-', '4', '5', '6', '+', '1', '2', '3', '=', '0', '.'];
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="calc-card" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-head">
+          <h3><CalcIcon size={16} /> Calculadora</h3>
+          <button className="icon-btn" onClick={onClose}><X size={18} /></button>
+        </div>
+        <div className="calc-display">{v}</div>
+        <div className="calc-grid">
+          {keys.map((k) => (
+            <button key={k} className={`calc-key ${['=', '+', '-', '×', '÷'].includes(k) ? 'op' : ''} ${k === '=' ? 'eq' : ''}`} onClick={() => press(k)}>{k}</button>
+          ))}
+        </div>
+        <small className="muted center">Tip: util para sumar honorarios brutos antes del registro.</small>
+      </div>
+    </div>
+  );
+}
 
-  const fetchAllRecords = async () => {
-    setDbLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from('cirugias')
-        .select('*')
-        .order('created_at', { ascending: false });
-      
-      if (error) throw error;
-      setAllRecords(data || []);
-    } catch (err) {
-      console.error('Error fetching all records:', err);
-    } finally {
-      setDbLoading(false);
-    }
-  };
+// ---------- Agenda (Weekly / Monthly) ----------
+function AgendaPanel({ records, notes, jornadas, onSelectDay, onAddDay, onMinimize }) {
+  const [mode, setMode] = useState('mes'); // semana | mes
+  const [cursor, setCursor] = useState(new Date());
 
-  useEffect(() => {
-    if (adminView && isAdmin(user)) {
-      fetchAllRecords();
-    }
-  }, [adminView, user]);
-
-  useEffect(() => {
-    localStorage.setItem('surgitrack-dark', String(darkMode));
-    document.documentElement.setAttribute('data-theme', darkMode ? 'dark' : 'light');
-  }, [darkMode]);
-
-  useEffect(() => {
-    localStorage.setItem('surgitrack-colors', JSON.stringify(colors));
-    Object.entries(colors).forEach(([key, value]) => {
-      document.documentElement.style.setProperty(`--${key}-color`, value);
-    });
-  }, [colors]);
-
-  useEffect(() => {
-    const scripts = [XLSX_SCRIPT_URL, JSPDF_SCRIPT_URL];
-    scripts.forEach(url => {
-      const script = document.createElement("script");
-      script.src = url;
-      document.head.appendChild(script);
-    });
-  }, []);
-
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    setUser(null);
-    setRecords([]);
-    setAdminView(false);
-  };
-
-  const calculateFinance = (bruto) => {
-    const val = parseFloat(bruto) || 0;
-    const retencion = val * TAX_RATE;
-    const liquido = val - retencion;
-    return { bruto: val, retencion, liquido };
-  };
-
-  const activeRecords = useMemo(() => records.filter(r => !r.deleted), [records]);
-  const trashedRecords = useMemo(() => records.filter(r => r.deleted), [records]);
-
-  const openFormWithDate = (dateStr) => {
-    setEditingId(null);
-    setFormData({
-      fecha: dateStr,
-      hora: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }),
-      institucion: '',
-      paciente: '',
-      tipoCx: '',
-      medico: '',
-      tecnica: '',
-      zonaCuerpo: '',
-      valorBruto: '',
-      deleted: false
-    });
-    setView('form');
-  };
-
-  const exportToExcel = (dataToExport, filename) => {
-    if (!window.XLSX) return;
-    const worksheetData = dataToExport.map(r => {
-      const f = calculateFinance(r.valorBruto);
-      return {
-        "ID Registro": r.id, "Fecha": r.fecha, "Hora": r.hora, "Paciente": r.paciente,
-        "Procedimiento": r.tipoCx, "Tecnica": r.tecnica || 'N/A', "Zona Cuerpo": r.zonaCuerpo || 'N/A',
-        "Medico": r.medico || 'N/A', "Institucion": r.institucion, "Monto Bruto ($)": f.bruto,
-        "Retencion 15.25% ($)": f.retencion, "Monto Neto ($)": f.liquido
-      };
-    });
-    const worksheet = window.XLSX.utils.json_to_sheet(worksheetData);
-    const workbook = window.XLSX.utils.book_new();
-    window.XLSX.utils.book_append_sheet(workbook, worksheet, "Cirugias");
-    window.XLSX.writeFile(workbook, `${filename}.xlsx`);
-  };
-
-  const exportToPDF = (stats, date) => {
-    if (!window.jspdf) return;
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF();
-    const mes = date.toLocaleString('es-ES', { month: 'long', year: 'numeric' });
-
-    doc.setFontSize(22);
-    doc.setTextColor(13, 110, 253);
-    doc.text("SurgiTask Pro - Planner Profesional", 20, 25);
-    
-    doc.setFontSize(12);
-    doc.setTextColor(100);
-    doc.text(`Reporte Financiero Mensual: ${mes}`, 20, 35);
-
-    doc.setDrawColor(200);
-    doc.line(20, 50, 190, 50);
-
-    doc.setFontSize(14);
-    doc.setTextColor(0);
-    doc.text("Resumen de Ingresos", 20, 65);
-    
-    doc.setFontSize(11);
-    doc.text(`Total de Procedimientos: ${stats.count}`, 30, 75);
-    doc.text(`Total Ingresos Brutos: $${stats.bruto.toLocaleString()}`, 30, 85);
-    doc.setTextColor(220, 53, 69);
-    doc.text(`Retencion de Impuestos (${(TAX_RATE * 100).toFixed(2)}%): -$${stats.retencion.toLocaleString(undefined, {maximumFractionDigits: 0})}`, 30, 95);
-    
-    doc.setFontSize(16);
-    doc.setTextColor(25, 135, 84);
-    doc.text(`TOTAL LIQUIDO PERCIBIDO: $${stats.liquido.toLocaleString(undefined, {maximumFractionDigits: 0})}`, 20, 115);
-
-    doc.setFontSize(10);
-    doc.setTextColor(150);
-    doc.text("SurgiTask Pro - desarrollado por Diego Roman Developer", 20, 280);
-
-    doc.save(`Reporte_Financiero_${mes.replace(' ', '_')}.pdf`);
-  };
-
-  const statsPeriodo = useMemo(() => {
-    const month = selectedAnalysisDate.getMonth();
-    const year = selectedAnalysisDate.getFullYear();
-    const filtered = activeRecords.filter(r => {
-      const d = new Date(r.fecha + "T00:00:00");
-      return d.getMonth() === month && d.getFullYear() === year;
-    });
-    const bruto = filtered.reduce((acc, curr) => acc + (parseFloat(curr.valorBruto) || 0), 0);
-    return { bruto, retencion: bruto * TAX_RATE, liquido: bruto * (1 - TAX_RATE), count: filtered.length, filteredRecords: filtered };
-  }, [activeRecords, selectedAnalysisDate]);
-
-  const filteredHistory = useMemo(() => {
-    return activeRecords.filter(r => {
-      const matchesSearch = 
-        r.paciente?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        r.tipoCx?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        r.institucion?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        r.medico?.toLowerCase().includes(searchTerm.toLowerCase());
-      
-      const dateVal = new Date(r.fecha + "T00:00:00");
-      const startLimit = dateRange.start ? new Date(dateRange.start + "T00:00:00") : null;
-      const endLimit = dateRange.end ? new Date(dateRange.end + "T23:59:59") : null;
-      const matchesDate = (!startLimit || dateVal >= startLimit) && (!endLimit || dateVal <= endLimit);
-      
-      return matchesSearch && matchesDate;
-    });
-  }, [activeRecords, searchTerm, dateRange]);
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setDbLoading(true);
-    try {
-      const recordData = {
-        ...formData,
-        user_id: user.id,
-        user_email: user.email,
-        created_by: user.email
-      };
-
-      if (editingId) {
-        const { error } = await supabase
-          .from('cirugias')
-          .update(recordData)
-          .eq('id', editingId);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase
-          .from('cirugias')
-          .insert([{ ...recordData, id: `CX-${Date.now()}` }]);
-        if (error) throw error;
-      }
-      
-      await fetchRecords();
-      setFormData({
-        fecha: new Date().toISOString().split('T')[0],
-        hora: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }),
-        institucion: '',
-        paciente: '',
-        tipoCx: '',
-        medico: '',
-        tecnica: '',
-        zonaCuerpo: '',
-        valorBruto: '',
-        deleted: false
-      });
-      setEditingId(null);
-      setView('history');
-    } catch (err) {
-      console.error('Error saving record:', err);
-      alert('Error al guardar: ' + err.message);
-    } finally {
-      setDbLoading(false);
-    }
-  };
-
-  const softDelete = async (id) => {
-    try {
-      const { error } = await supabase
-        .from('cirugias')
-        .update({ deleted: true })
-        .eq('id', id);
-      if (error) throw error;
-      await fetchRecords();
-      if(selectedDayRecords) {
-        setSelectedDayRecords(prev => ({
-          ...prev,
-          records: prev.records.filter(r => r.id !== id)
-        }));
-      }
-    } catch (err) {
-      console.error('Error deleting:', err);
-    }
-  };
-
-  const restoreRecord = async (id) => {
-    try {
-      const { error } = await supabase
-        .from('cirugias')
-        .update({ deleted: false })
-        .eq('id', id);
-      if (error) throw error;
-      await fetchRecords();
-    } catch (err) {
-      console.error('Error restoring:', err);
-    }
-  };
-
-  const adminDelete = async (id) => {
-    try {
-      const { error } = await supabase
-        .from('cirugias')
-        .update({ deleted: true })
-        .eq('id', id);
-      if (error) throw error;
-      await fetchAllRecords();
-    } catch (err) {
-      console.error('Error admin delete:', err);
-    }
-  };
-
-  const adminRestore = async (id) => {
-    try {
-      const { error } = await supabase
-        .from('cirugias')
-        .update({ deleted: false })
-        .eq('id', id);
-      if (error) throw error;
-      await fetchAllRecords();
-    } catch (err) {
-      console.error('Error admin restore:', err);
-    }
-  };
-
-  const calendarDays = useMemo(() => {
-    const year = currentCalDate.getFullYear();
-    const month = currentCalDate.getMonth();
+  const monthDays = useMemo(() => {
+    const y = cursor.getFullYear(), m = cursor.getMonth();
+    const first = new Date(y, m, 1).getDay();
+    const last = new Date(y, m + 1, 0).getDate();
     const days = [];
-    const firstDay = new Date(year, month, 1).getDay();
-    const daysInMonth = new Date(year, month + 1, 0).getDate();
-    for (let i = 0; i < firstDay; i++) days.push({ day: null });
-    for (let i = 1; i <= daysInMonth; i++) {
-      const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
-      days.push({ day: i, date: dateStr, records: activeRecords.filter(r => r.fecha === dateStr) });
-    }
+    for (let i = 0; i < first; i++) days.push(null);
+    for (let i = 1; i <= last; i++) days.push(dateToStr(new Date(y, m, i)));
     return days;
-  }, [currentCalDate, activeRecords]);
+  }, [cursor]);
 
-  const selectedDayFinance = useMemo(() => {
-    if (!selectedDayRecords) return null;
-    const bruto = selectedDayRecords.records.reduce((acc, curr) => acc + (parseFloat(curr.valorBruto) || 0), 0);
-    const retencion = bruto * TAX_RATE;
-    const liquido = bruto - retencion;
-    return { bruto, retencion, liquido };
-  }, [selectedDayRecords]);
+  const weekDays = useMemo(() => {
+    const start = new Date(cursor);
+    start.setDate(start.getDate() - start.getDay());
+    return Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(start); d.setDate(start.getDate() + i); return dateToStr(d);
+    });
+  }, [cursor]);
 
-  if (authLoading) {
-    return (
-      <div className="min-vh-100 d-flex align-items-center justify-content-center" style={{ backgroundColor: 'var(--bg-primary)' }}>
-        <Loader2 size={40} className="spinner-border text-primary" />
-      </div>
-    );
-  }
+  const todayStr = dateToStr(new Date());
+  const recordsByDay = useMemo(() => {
+    const m = {};
+    records.filter((r) => !r.deleted).forEach((r) => { (m[r.fecha] = m[r.fecha] || []).push(r); });
+    return m;
+  }, [records]);
 
-  if (!user) {
-    return <AuthScreen onLogin={setUser} darkMode={darkMode} />;
-  }
+  const titleLabel = mode === 'mes'
+    ? cursor.toLocaleDateString('es-CL', { month: 'long', year: 'numeric' })
+    : `Semana del ${parseDate(weekDays[0]).toLocaleDateString('es-CL', { day: 'numeric', month: 'short' })}`;
 
-  const currentView = adminView ? 'admin' : view;
+  const step = (dir) => {
+    const c = new Date(cursor);
+    if (mode === 'mes') c.setMonth(c.getMonth() + dir);
+    else c.setDate(c.getDate() + 7 * dir);
+    setCursor(c);
+  };
 
   return (
-    <div className="min-vh-100 d-flex flex-column" style={{ width: '100vw', overflowX: 'hidden', backgroundColor: 'var(--bg-primary)', color: 'var(--text-contrast)' }}>
-      <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" />
-      <style>{`
-        body { font-family: 'Inter', sans-serif; background: var(--bg-primary); color: var(--text-contrast); }
-        .text-contrast-fix { color: var(--text-contrast) !important; }
-        .text-muted-fix { color: var(--text-muted) !important; }
-        
-        .form-control, .form-select {
-          background-color: var(--bg-input) !important;
-          color: var(--text-contrast) !important;
-          border: 1px solid var(--border-input) !important;
-          padding: 12px 16px;
-          border-radius: 12px;
-        }
-
-        .glass-card { 
-          background: var(--bg-card); 
-          backdrop-filter: blur(10px); 
-          border: 1px solid var(--border-color);
-          border-radius: 24px;
-          box-shadow: var(--shadow-glass);
-        }
-
-        .calendar-cell { 
-          min-height: 100px; 
-          border-radius: 12px; 
-          transition: 0.2s; 
-          border: 1px solid var(--border-color); 
-          padding: 8px;
-        }
-
-        .btn-circular-add {
-          width: 26px !important;
-          height: 26px !important;
-          min-width: 26px !important;
-          min-height: 26px !important;
-          max-width: 26px !important;
-          max-height: 26px !important;
-          border-radius: 50% !important;
-          padding: 0 !important;
-          display: flex !important;
-          align-items: center !important;
-          justify-content: center !important;
-          border: none !important;
-          background-color: var(--primary-color) !important;
-          color: #ffffff !important;
-          cursor: pointer !important;
-          transition: transform 0.2s, background-color 0.2s;
-          box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-          flex-shrink: 0;
-        }
-        
-        .btn-circular-add:hover {
-          background-color: color-mix(in srgb, var(--primary-color) 85%, black) !important;
-          transform: scale(1.1);
-        }
-
-        .btn-plus-float {
-          position: fixed; bottom: 30px; right: 30px; width: 60px; height: 60px; border-radius: 50%;
-          z-index: 1000; display: flex; align-items: center; justify-content: center;
-          box-shadow: 0 10px 25px color-mix(in srgb, var(--primary-color) 40%, transparent);
-          transition: 0.3s;
-          color: #ffffff !important;
-        }
-
-        .btn-plus-float:hover {
-          transform: scale(1.1);
-          box-shadow: 0 14px 32px color-mix(in srgb, var(--primary-color) 50%, transparent);
-        }
-        
-        .btn-nav-cal {
-           background-color: var(--btn-nav-cal-bg);
-           color: var(--btn-nav-cal-text);
-           border: 1px solid var(--border-input);
-        }
-
-        .animate-fade { animation: fadeIn 0.3s ease forwards; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-      `}</style>
-
-      <Navbar view={view} setView={(v) => { setView(v); setAdminView(false); }} darkMode={darkMode} setDarkMode={setDarkMode} onOpenSettings={() => setShowSettings(true)} user={user} onLogout={handleLogout} adminView={adminView} />
-
-      <SettingsPanel show={showSettings} onClose={() => setShowSettings(false)} colors={colors} setColors={setColors} />
-
-      {!adminView && (
-        <button onClick={() => { setEditingId(null); setFormData({ fecha: new Date().toISOString().split('T')[0], hora: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }), institucion: '', paciente: '', tipoCx: '', medico: '', tecnica: '', zonaCuerpo: '', valorBruto: '', deleted: false }); setView('form'); }} className="btn btn-primary btn-plus-float">
-          <Plus size={32} strokeWidth={3} />
-        </button>
-      )}
-
-      <main className="container-fluid px-3 px-md-5 py-4 flex-grow-1">
-        
-        {currentView === 'form' && (
-          <div className="d-flex justify-content-center animate-fade py-2">
-            <div className="card glass-card p-4 p-md-5 w-100 shadow-lg" style={{ maxWidth: '800px' }}>
-              <div className="d-flex justify-content-between align-items-start mb-4">
-                <div className="text-start">
-                  <h2 className="fw-bold text-contrast-fix m-0">{editingId ? 'Editar Cirugia' : 'Nuevo Registro'}</h2>
-                  <p className="text-muted-fix small">Retencion Automatica del {(TAX_RATE*100).toFixed(2)}%</p>
-                </div>
-                <button onClick={() => setView('calendar')} className="btn rounded-circle p-2 border-0" style={{ color: 'var(--text-contrast)' }}><X size={24} /></button>
-              </div>
-
-              <form onSubmit={handleSubmit} className="row g-3 text-start">
-                <div className="col-md-6">
-                  <label className="form-label fw-bold text-contrast-fix small">FECHA</label>
-                  <input type="date" className="form-control" value={formData.fecha} onChange={e => setFormData({...formData, fecha: e.target.value})} required />
-                </div>
-                <div className="col-md-6">
-                  <label className="form-label fw-bold text-contrast-fix small">HORA</label>
-                  <input type="time" className="form-control" value={formData.hora} onChange={e => setFormData({...formData, hora: e.target.value})} required />
-                </div>
-                <div className="col-12">
-                  <label className="form-label fw-bold text-contrast-fix small">PACIENTE</label>
-                  <input type="text" className="form-control" placeholder="Nombre completo" value={formData.paciente} onChange={e => setFormData({...formData, paciente: e.target.value})} required />
-                </div>
-                <div className="col-12">
-                  <label className="form-label fw-bold text-contrast-fix small d-flex justify-content-between align-items-center">
-                    TIPO DE CIRUGIA / PROCEDIMIENTO
-                    <button type="button" className="btn btn-sm btn-outline-primary rounded-pill py-0 px-2" onClick={() => setShowTipoCxManager(!showTipoCxManager)}>
-                      <Pencil size={12} className="me-1" /> Gestionar
-                    </button>
-                  </label>
-                  <select className="form-select" value={formData.tipoCx} onChange={e => setFormData({...formData, tipoCx: e.target.value})} required>
-                    <option value="">Seleccionar tipo de cirugia...</option>
-                    {tiposCx.map((t, i) => <option key={i} value={t}>{t}</option>)}
-                  </select>
-                  {showTipoCxManager && (
-                    <ManagerPanel title="Tipos de Cirugia" icon={Scissors} items={tiposCx} setItems={setTiposCx} storageKey="surgitrack-tipos-cx" />
-                  )}
-                </div>
-                <div className="col-md-6">
-                  <label className="form-label fw-bold text-contrast-fix small d-flex justify-content-between align-items-center">
-                    TECNICA QUIRURGICA
-                    <button type="button" className="btn btn-sm btn-outline-accent rounded-pill py-0 px-2" onClick={() => setShowTecnicaManager(!showTecnicaManager)}>
-                      <Pencil size={12} className="me-1" /> Gestionar
-                    </button>
-                  </label>
-                  <select className="form-select" value={formData.tecnica} onChange={e => setFormData({...formData, tecnica: e.target.value})} required>
-                    <option value="">Seleccionar tecnica...</option>
-                    {tecnicas.map((t, i) => <option key={i} value={t}>{t}</option>)}
-                  </select>
-                  {showTecnicaManager && (
-                    <ManagerPanel title="Tecnicas Quirurgicas" icon={Activity} items={tecnicas} setItems={setTecnicas} storageKey="surgitrack-tecnicas" />
-                  )}
-                </div>
-                <div className="col-md-6">
-                  <label className="form-label fw-bold text-contrast-fix small d-flex justify-content-between align-items-center">
-                    ZONA DEL CUERPO
-                    <button type="button" className="btn btn-sm btn-outline-secondary rounded-pill py-0 px-2" onClick={() => setShowZonaCuerpoManager(!showZonaCuerpoManager)}>
-                      <Pencil size={12} className="me-1" /> Gestionar
-                    </button>
-                  </label>
-                  <select className="form-select" value={formData.zonaCuerpo} onChange={e => setFormData({...formData, zonaCuerpo: e.target.value})} required>
-                    <option value="">Seleccionar zona...</option>
-                    {zonasCuerpo.map((z, i) => <option key={i} value={z}>{z}</option>)}
-                  </select>
-                  {showZonaCuerpoManager && (
-                    <ManagerPanel title="Zonas del Cuerpo" icon={LocateFixed} items={zonasCuerpo} setItems={setZonasCuerpo} storageKey="surgitrack-zonas-cuerpo" />
-                  )}
-                </div>
-                <div className="col-12">
-                  <label className="form-label fw-bold text-contrast-fix small d-flex justify-content-between align-items-center">
-                    MEDICO QUE OPERA
-                    <button type="button" className="btn btn-sm btn-outline-primary rounded-pill py-0 px-2" onClick={() => setShowMedicoManager(!showMedicoManager)}>
-                      <Pencil size={12} className="me-1" /> Gestionar Medicos
-                    </button>
-                  </label>
-                  <select className="form-select" value={formData.medico} onChange={e => setFormData({...formData, medico: e.target.value})} required>
-                    <option value="">Seleccionar medico...</option>
-                    {medicos.map((m, i) => <option key={i} value={m}>{m}</option>)}
-                  </select>
-                  {showMedicoManager && (
-                    <ManagerPanel title="Medicos" icon={Users} items={medicos} setItems={setMedicos} storageKey="surgitrack-medicos" />
-                  )}
-                </div>
-                <div className="col-12">
-                  <label className="form-label fw-bold text-contrast-fix small d-flex justify-content-between align-items-center">
-                    INSTITUCION
-                    <button type="button" className="btn btn-sm btn-outline-success rounded-pill py-0 px-2" onClick={() => setShowInstitucionManager(!showInstitucionManager)}>
-                      <Pencil size={12} className="me-1" /> Gestionar
-                    </button>
-                  </label>
-                  <select className="form-select" value={formData.institucion} onChange={e => setFormData({...formData, institucion: e.target.value})} required>
-                    <option value="">Seleccionar institucion...</option>
-                    {instituciones.map((inst, i) => <option key={i} value={inst}>{inst}</option>)}
-                  </select>
-                  {showInstitucionManager && (
-                    <ManagerPanel title="Instituciones" icon={Building2} items={instituciones} setItems={setInstituciones} storageKey="surgitrack-instituciones" />
-                  )}
-                </div>
-                <div className="col-12">
-                  <label className="form-label fw-bold text-contrast-fix small">HONORARIOS BRUTOS ($)</label>
-                  <input type="number" className="form-control fw-bold text-primary h4 py-3" value={formData.valorBruto} onChange={e => setFormData({...formData, valorBruto: e.target.value})} required />
-                </div>
-                <div className="col-12 mt-4">
-                  <button type="submit" className="btn btn-primary w-100 p-3 rounded-pill fw-bold shadow-sm" disabled={dbLoading}>
-                    {dbLoading ? <Loader2 size={20} className="spinner-border" /> : (editingId ? 'Guardar Cambios' : 'Confirmar Registro')}
-                  </button>
-                </div>
-              </form>
-            </div>
+    <div className="agenda-panel">
+      <div className="agenda-head">
+        <div className="agenda-title">
+          <CalendarIcon size={18} />
+          <h3>{titleLabel}</h3>
+        </div>
+        <div className="agenda-controls">
+          <div className="seg">
+            <button className={mode === 'semana' ? 'on' : ''} onClick={() => setMode('semana')}>Semana</button>
+            <button className={mode === 'mes' ? 'on' : ''} onClick={() => setMode('mes')}>Mes</button>
           </div>
-        )}
+          <button className="icon-btn" onClick={() => step(-1)}><ChevronLeft size={16} /></button>
+          <button className="btn-ghost sm" onClick={() => setCursor(new Date())}>Hoy</button>
+          <button className="icon-btn" onClick={() => step(1)}><ChevronRight size={16} /></button>
+          <button className="btn-ghost sm" onClick={onMinimize}><X size={14} /> Cerrar</button>
+        </div>
+      </div>
 
-        {currentView === 'admin' && (
-          <AdminView records={allRecords} loading={dbLoading} onDelete={adminDelete} onRestore={adminRestore} />
-        )}
-
-        {currentView === 'calendar' && (
-          <div className="animate-fade">
-            <div className="d-flex flex-column flex-md-row justify-content-between align-items-center mb-4 gap-3">
-              <h2 className="fw-bold m-0 text-contrast-fix">Agenda Quirurgica</h2>
-              <div className="d-flex align-items-center rounded-pill p-1" style={{ backgroundColor: darkMode ? 'rgba(108,117,125,0.15)' : 'var(--bg-card-alt)' }}>
-                <button onClick={() => setCurrentCalDate(new Date(currentCalDate.getFullYear(), currentCalDate.getMonth() - 1, 1))} className="btn btn-sm btn-nav-cal rounded-circle"><ChevronLeft size={16}/></button>
-                <span className="px-3 fw-bold text-uppercase small text-contrast-fix" style={{ minWidth: '160px', textAlign: 'center' }}>
-                  {currentCalDate.toLocaleString('es-ES', { month: 'long', year: 'numeric' })}
-                </span>
-                <button onClick={() => setCurrentCalDate(new Date(currentCalDate.getFullYear(), currentCalDate.getMonth() + 1, 1))} className="btn btn-sm btn-nav-cal rounded-circle"><ChevronRight size={16}/></button>
+      {mode === 'mes' ? (
+        <div className="month-grid">
+          {['Dom', 'Lun', 'Mar', 'Mie', 'Jue', 'Vie', 'Sab'].map((d) => <div key={d} className="dow">{d}</div>)}
+          {monthDays.map((ds, i) => {
+            if (!ds) return <div key={i} className="day empty" />;
+            const recs = recordsByDay[ds] || [];
+            const jornada = jornadas[ds];
+            const dayN = parseDate(ds).getDate();
+            return (
+              <div key={ds} className={`day ${ds === todayStr ? 'today' : ''}`}
+                   style={{ background: jornada && jornada !== 'ninguna' ? JORNADA_COLORS[jornada] : undefined }}
+                   onClick={() => onSelectDay(ds)}>
+                <div className="day-head">
+                  <span className="day-num">{dayN}</span>
+                  <button className="add-mini" onClick={(e) => { e.stopPropagation(); onAddDay(ds); }}><Plus size={12} /></button>
+                </div>
+                <div className="day-events">
+                  {recs.slice(0, 3).map((r) => (
+                    <div key={r.id} className="ev"><b>{r.hora}</b> {r.paciente}</div>
+                  ))}
+                  {recs.length > 3 && <small>+{recs.length - 3} mas</small>}
+                  {(notes[ds] || []).slice(0, 1).map((n) => (
+                    <div key={n.id} className="ev note" style={{ background: n.color, color: '#1a1a1a' }}>{n.text}</div>
+                  ))}
+                </div>
               </div>
-            </div>
-
-            <div className="row g-4">
-              <div className={selectedDayRecords ? "col-lg-8" : "col-12"}>
-                <div className="calendar-grid d-grid" style={{ gridTemplateColumns: 'repeat(7, 1fr)', gap: '8px' }}>
-                  {['Dom', 'Lun', 'Mar', 'Mie', 'Jue', 'Vie', 'Sab'].map(d => ( <div key={d} className="text-center fw-bold text-muted small py-2">{d}</div> ))}
-                  {calendarDays.map((d, i) => (
-                    <div key={i} className={`calendar-cell ${d.day ? (darkMode ? 'bg-dark' : 'bg-white') : 'bg-transparent border-0'} ${d.records?.length > 0 ? 'border-primary border-opacity-50 shadow-sm' : ''}`} style={d.records?.length > 0 ? {backgroundColor: 'var(--bg-calendar-event)'} : {}}>
-                      {d.day && (
-                        <>
-                          <div className="d-flex justify-content-between align-items-start mb-2">
-                            <span className={`fw-bold small ${d.records?.length > 0 ? 'text-primary' : 'text-contrast-fix'}`}>{d.day}</span>
-                            <button 
-                              type="button"
-                              onClick={(e) => { e.stopPropagation(); openFormWithDate(d.date); }} 
-                              className="btn-circular-add"
-                            >
-                              <Plus size={16} strokeWidth={4} />
-                            </button>
-                          </div>
-                          <div onClick={() => setSelectedDayRecords(d)} style={{ cursor: 'pointer', minHeight: '50px' }}>
-                            {d.records?.slice(0, 2).map((r, idx) => (
-                              <div key={idx} className="bg-primary bg-opacity-10 text-primary small px-2 py-1 rounded mb-1 text-truncate fw-bold" style={{ fontSize: '9px' }}>{r.paciente}</div>
-                            ))}
-                            {d.records?.length > 2 && <div className="text-muted-fix text-center fw-bold" style={{ fontSize: '8px' }}>+{d.records.length - 2}</div>}
-                          </div>
-                        </>
-                      )}
+            );
+          })}
+        </div>
+      ) : (
+        <div className="week-grid">
+          <div className="hours-col">
+            <div className="dow-spacer" />
+            {Array.from({ length: 24 }, (_, h) => <div key={h} className="hour-cell">{pad2(h)}:00</div>)}
+          </div>
+          {weekDays.map((ds) => {
+            const d = parseDate(ds);
+            const recs = recordsByDay[ds] || [];
+            const jornada = jornadas[ds];
+            return (
+              <div key={ds} className={`week-col ${ds === todayStr ? 'today' : ''}`}>
+                <div className="week-col-head" onClick={() => onSelectDay(ds)}>
+                  <small>{d.toLocaleDateString('es-CL', { weekday: 'short' })}</small>
+                  <b>{d.getDate()}</b>
+                  <button className="add-mini" onClick={(e) => { e.stopPropagation(); onAddDay(ds); }}><Plus size={12} /></button>
+                </div>
+                <div className="hours-wrap" style={{ background: jornada && jornada !== 'ninguna' ? JORNADA_COLORS[jornada] : undefined }}>
+                  {Array.from({ length: 24 }, (_, h) => (
+                    <div key={h} className="hour-slot" onClick={() => onSelectDay(ds)}>
+                      {recs.filter((r) => parseInt(r.hora?.split(':')[0], 10) === h).map((r) => (
+                        <div key={r.id} className="ev-slot" title={`${r.paciente} · ${r.tipoCx}`}>
+                          <b>{r.hora}</b> {r.paciente}
+                        </div>
+                      ))}
                     </div>
                   ))}
                 </div>
               </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
 
-              {selectedDayRecords && (
-                <div className="col-lg-4 animate-fade">
-                  <div className={`card glass-card h-100 shadow-lg ${darkMode ? 'border-secondary' : ''}`}>
-                    <div className="card-body p-4 text-start">
-                      <div className="d-flex justify-content-between mb-3">
-                        <h4 className="fw-bold text-contrast-fix m-0">Dia {selectedDayRecords.date.split('-').reverse().join('/')}</h4>
-                        <button className={`btn-close ${darkMode ? 'btn-close-white' : ''}`} onClick={() => setSelectedDayRecords(null)}></button>
-                      </div>
+// ---------- Reportes ----------
+function ReportesPanel({ records }) {
+  const [preset, setPreset] = useState('mes');
+  const [from, setFrom] = useState('');
+  const [to, setTo] = useState('');
 
-                      {selectedDayFinance && selectedDayFinance.bruto > 0 && (
-                        <div className="p-3 rounded-4 mb-4 border" style={{ backgroundColor: 'color-mix(in srgb, var(--success-color) 10%, transparent)', borderColor: 'color-mix(in srgb, var(--success-color) 25%, transparent)' }}>
-                           <div className="d-flex align-items-center gap-2 mb-2">
-                             <Receipt size={18} className="text-success"/>
-                             <span className="fw-bold text-success small">Resumen Diario</span>
-                           </div>
-                           <div className="d-flex justify-content-between small mb-1">
-                             <span className="text-muted-fix">Total Bruto:</span>
-                             <span className="fw-bold text-contrast-fix">${selectedDayFinance.bruto.toLocaleString()}</span>
-                           </div>
-                           <div className="d-flex justify-content-between small mb-1">
-                             <span className="text-muted-fix">Retencion ({(TAX_RATE*100).toFixed(2)}%):</span>
-                             <span className="fw-bold text-danger">-${selectedDayFinance.retencion.toLocaleString(undefined, {maximumFractionDigits: 0})}</span>
-                           </div>
-                           <hr className="my-2 opacity-10" />
-                           <div className="d-flex justify-content-between align-items-center">
-                             <span className="fw-bold text-success small">LIQUIDO:</span>
-                             <span className="h5 fw-bold text-success m-0">${selectedDayFinance.liquido.toLocaleString(undefined, {maximumFractionDigits: 0})}</span>
-                           </div>
-                        </div>
-                      )}
+  const range = useMemo(() => {
+    const now = new Date();
+    let start, end;
+    if (preset === 'semana') {
+      start = new Date(now); start.setDate(now.getDate() - now.getDay());
+      end = new Date(start); end.setDate(start.getDate() + 6);
+    } else if (preset === 'mes') {
+      start = new Date(now.getFullYear(), now.getMonth(), 1);
+      end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    } else if (preset === 'bimestre') {
+      start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    } else if (preset === 'trimestre') {
+      start = new Date(now.getFullYear(), now.getMonth() - 2, 1);
+      end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    } else if (preset === 'anio') {
+      start = new Date(now.getFullYear(), 0, 1);
+      end = new Date(now.getFullYear(), 11, 31);
+    } else {
+      start = from ? parseDate(from) : new Date(2000, 0, 1);
+      end = to ? parseDate(to) : new Date(2100, 0, 1);
+    }
+    return { start, end };
+  }, [preset, from, to]);
 
-                      <button onClick={() => openFormWithDate(selectedDayRecords.date)} className="btn btn-primary w-100 mb-4 rounded-pill fw-bold"><Plus size={18} className="me-2"/> Nueva en este dia</button>
-                      
-                      <div className="records-list" style={{ maxHeight: '400px', overflowY: 'auto' }}>
-                        {selectedDayRecords.records.length === 0 ? (
-                          <p className="text-center text-muted small py-4">No hay cirugias programadas</p>
-                        ) : (
-                          selectedDayRecords.records.map((r, idx) => (
-                            <div key={idx} className="border-bottom border-secondary border-opacity-10 pb-3 mb-3 last-child-border-0">
-                              <div className="d-flex justify-content-between fw-bold text-contrast-fix mb-1">
-                                <span><Clock size={14} className="me-1"/>{r.hora}</span>
-                                <span className="text-primary">${Number(r.valorBruto).toLocaleString()}</span>
-                              </div>
-                              <div className="text-contrast-fix fw-bold small">{r.paciente}</div>
-                              <div className="record-detail-line">
-                                <span className="badge bg-primary bg-opacity-10 text-primary me-1">{r.tipoCx}</span>
-                                {r.tecnica && <span className="badge bg-accent bg-opacity-10 text-accent me-1">{r.tecnica}</span>}
-                                {r.zonaCuerpo && <span className="badge bg-secondary bg-opacity-10 text-secondary me-1">{r.zonaCuerpo}</span>}
-                              </div>
-                              <div className="text-muted-fix x-small mt-1" style={{ fontSize: '11px' }}>{r.medico || 'Sin medico'} • {r.institucion}</div>
-                            </div>
-                          ))
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
+  const filtered = useMemo(() => records.filter((r) => {
+    if (r.deleted) return false;
+    const d = parseDate(r.fecha);
+    return d >= range.start && d <= range.end;
+  }), [records, range]);
+
+  const stats = useMemo(() => {
+    const bruto = filtered.reduce((a, c) => a + (parseFloat(c.valorBruto) || 0), 0);
+    const retencion = bruto * TAX_RATE;
+    return { bruto, retencion, liquido: bruto - retencion, count: filtered.length };
+  }, [filtered]);
+
+  const downloadCSV = () => {
+    const headers = ['Fecha', 'Hora', 'Paciente', 'Cirugia', 'Cirujano', 'Institucion', 'Bruto', 'Retencion', 'Liquido'];
+    const rows = filtered.map((r) => {
+      const f = calcFinance(r.valorBruto);
+      return [r.fecha, r.hora, r.paciente, r.tipoCx, r.medico, r.institucion, f.bruto, f.retencion.toFixed(0), f.liquido.toFixed(0)];
+    });
+    const csv = [headers, ...rows].map((row) => row.map((c) => `"${String(c ?? '').replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `agenda-quirurgica-${preset}.csv`; a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  return (
+    <div className="reportes">
+      <div className="rep-presets">
+        {[['semana', 'Semana'], ['mes', 'Mes'], ['bimestre', '2 meses'], ['trimestre', '3 meses'], ['anio', 'Anio'], ['custom', 'Personalizado']].map(([k, l]) => (
+          <button key={k} className={preset === k ? 'on' : ''} onClick={() => setPreset(k)}>{l}</button>
+        ))}
+      </div>
+      {preset === 'custom' && (
+        <div className="rep-range">
+          <input className="input" type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
+          <span>a</span>
+          <input className="input" type="date" value={to} onChange={(e) => setTo(e.target.value)} />
+        </div>
+      )}
+
+      <div className="kpi-row">
+        <div className="kpi"><span>Cirugias</span><b>{stats.count}</b></div>
+        <div className="kpi"><span>Bruto</span><b>{fmtMoney(stats.bruto)}</b></div>
+        <div className="kpi neg"><span>Retencion {(TAX_RATE * 100).toFixed(2)}%</span><b>-{fmtMoney(stats.retencion)}</b></div>
+        <div className="kpi pos"><span>Liquido</span><b>{fmtMoney(stats.liquido)}</b></div>
+      </div>
+
+      <div className="rep-actions">
+        <button className="btn-primary" onClick={downloadCSV}><FileSpreadsheet size={16} /> Descargar CSV</button>
+        <button className="btn-ghost" onClick={() => window.print()}><FileText size={16} /> Imprimir / PDF</button>
+      </div>
+
+      <div className="rep-list">
+        {filtered.length === 0 ? <p className="muted center">Sin registros en este periodo.</p> : (
+          filtered.slice(0, 10).map((r) => (
+            <div key={r.id} className="rep-row">
+              <small>{r.fecha} {r.hora}</small>
+              <b>{r.paciente}</b>
+              <span>{r.tipoCx}</span>
+              <span className="money">{fmtMoney(r.valorBruto)}</span>
             </div>
-          </div>
+          ))
         )}
+        {filtered.length > 10 && <small className="muted center">... y {filtered.length - 10} mas (descarga CSV para verlos todos).</small>}
+      </div>
+    </div>
+  );
+}
 
-        {currentView === 'dashboard' && (
-          <div className="animate-fade text-start">
-            <div className="d-flex flex-column flex-md-row justify-content-between align-items-center mb-4 gap-3">
-              <h2 className="fw-bold text-contrast-fix m-0">Analisis Financiero</h2>
-              <div className="d-flex gap-2">
-                <select className="form-select form-select-sm rounded-pill px-3 fw-bold"
-                        value={selectedAnalysisDate.getMonth()} 
-                        onChange={e => setSelectedAnalysisDate(new Date(selectedAnalysisDate.getFullYear(), parseInt(e.target.value), 1))}>
-                  {['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'].map((m, i) => <option key={i} value={i}>{m}</option>)}
-                </select>
-                <select className="form-select form-select-sm rounded-pill px-3 fw-bold"
-                        value={selectedAnalysisDate.getFullYear()} 
-                        onChange={e => setSelectedAnalysisDate(new Date(parseInt(e.target.value), selectedAnalysisDate.getMonth(), 1))}>
-                  {[...Array(10)].map((_, i) => { const y = new Date().getFullYear() - 5 + i; return <option key={y} value={y}>{y}</option>; })}
-                </select>
-              </div>
-            </div>
+// ---------- Historial ----------
+function HistorialPanel({ records, onEdit, onDelete, onRestore, onView }) {
+  const [q, setQ] = useState('');
+  const [filterCol, setFilterCol] = useState('paciente');
+  const [showDeleted, setShowDeleted] = useState(false);
 
-            <div className="glass-card p-4 p-md-5 shadow-lg mb-4">
-              <div className="row align-items-center">
-                <div className="col-lg-7">
-                  <h4 className="text-primary fw-bold mb-4"><PieChart size={24} className="me-2"/> Resumen de {selectedAnalysisDate.toLocaleString('es-ES', { month: 'long', year: 'numeric' })}</h4>
-                  <div className="row g-3">
-                    <div className="col-6"><div className="p-4 rounded-4" style={{ backgroundColor: 'color-mix(in srgb, var(--secondary-color) 10%, transparent)' }}><span className="d-block text-muted-fix small fw-bold mb-1">CIRUGIAS</span><span className="h3 fw-bold text-contrast-fix">{statsPeriodo.count}</span></div></div>
-                    <div className="col-6"><div className="p-4 rounded-4" style={{ backgroundColor: 'color-mix(in srgb, var(--primary-color) 10%, transparent)' }}><span className="d-block text-muted-fix small fw-bold mb-1">TOTAL BRUTO</span><span className="h3 fw-bold text-contrast-fix">${statsPeriodo.bruto.toLocaleString()}</span></div></div>
-                  </div>
+  const filtered = useMemo(() => {
+    const term = q.toLowerCase().trim();
+    return records.filter((r) => {
+      if (!showDeleted && r.deleted) return false;
+      if (showDeleted && !r.deleted) return false;
+      if (!term) return true;
+      const val = String(r[filterCol] ?? '').toLowerCase();
+      return val.includes(term);
+    });
+  }, [records, q, filterCol, showDeleted]);
+
+  return (
+    <div className="historial">
+      <div className="hist-toolbar">
+        <div className="hist-search">
+          <Search size={14} />
+          <input className="input" placeholder={`Buscar por ${filterCol}...`} value={q} onChange={(e) => setQ(e.target.value)} />
+        </div>
+        <select className="input" value={filterCol} onChange={(e) => setFilterCol(e.target.value)}>
+          <option value="paciente">Paciente</option>
+          <option value="tipoCx">Tipo de cirugia</option>
+          <option value="medico">Cirujano</option>
+          <option value="institucion">Institucion</option>
+          <option value="fecha">Fecha</option>
+        </select>
+        <label className="check">
+          <input type="checkbox" checked={showDeleted} onChange={(e) => setShowDeleted(e.target.checked)} />
+          Papelera
+        </label>
+      </div>
+
+      <div className="hist-table-wrap">
+        <table className="hist-table">
+          <thead>
+            <tr>
+              <th>Fecha</th><th>Hora</th><th>Paciente</th><th>Cirugia</th><th>Cirujano</th><th>Institucion</th><th>Bruto</th><th>Liquido</th><th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.length === 0 ? (
+              <tr><td colSpan="9" className="muted center">Sin registros.</td></tr>
+            ) : filtered.map((r) => {
+              const f = calcFinance(r.valorBruto);
+              return (
+                <tr key={r.id} className={r.deleted ? 'deleted' : ''}>
+                  <td>{r.fecha}</td>
+                  <td>{r.hora}</td>
+                  <td><b>{r.paciente}</b></td>
+                  <td>{r.tipoCx}</td>
+                  <td>{r.medico}</td>
+                  <td>{r.institucion}</td>
+                  <td>{fmtMoney(f.bruto)}</td>
+                  <td className="pos">{fmtMoney(f.liquido)}</td>
+                  <td className="actions">
+                    <button className="icon-btn" title="Ver" onClick={() => onView(r)}><Eye size={14} /></button>
+                    {!r.deleted && <button className="icon-btn" title="Editar" onClick={() => onEdit(r)}><Edit3 size={14} /></button>}
+                    {r.deleted ? (
+                      <button className="icon-btn ok" title="Restaurar" onClick={() => onRestore(r.id)}><RotateCcw size={14} /></button>
+                    ) : (
+                      <button className="icon-btn danger" title="Eliminar" onClick={() => onDelete(r.id)}><Trash2 size={14} /></button>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      <small className="muted">{filtered.length} registro(s)</small>
+    </div>
+  );
+}
+
+// ============================================================================
+// APP
+// ============================================================================
+export default function App() {
+  // prefs
+  const prefs0 = loadPrefs();
+  const [theme, setTheme] = useState(prefs0.theme || (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'));
+  const [colors, setColors] = useState({ ...DEFAULT_COLORS, ...(prefs0.colors || {}) });
+  const [zoom, setZoom] = useState(prefs0.zoom || 1);
+
+  // data
+  const [data, setData] = useState(loadData);
+  const records = data.records;
+  const notes = data.notes;
+  const jornadas = data.jornadas;
+  const updateData = (mut) => setData((prev) => { const next = mut(prev); saveData(next); return next; });
+
+  // UI state
+  const [eyeOpen, setEyeOpen] = useState(false);
+  const [loginOpen, setLoginOpen] = useState(false);
+  const [registroFlipped, setRegistroFlipped] = useState(false);
+  const [agendaExpanded, setAgendaExpanded] = useState(false);
+  const [reportesFlipped, setReportesFlipped] = useState(false);
+  const [historialFlipped, setHistorialFlipped] = useState(false);
+  const [showCalculator, setShowCalculator] = useState(false);
+  const [showAbout, setShowAbout] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
+  const [selectedDay, setSelectedDay] = useState(null);
+  const [viewRecord, setViewRecord] = useState(null);
+
+  // auth
+  const [user, setUser] = useState(null);
+  const [authLoading, setAuthLoading] = useState(false);
+  const [authError, setAuthError] = useState('');
+
+  // catalogs
+  const prefsCatalogs = loadPrefs().catalogs || {};
+  const [tiposCx, setTiposCx] = useState(prefsCatalogs.tiposCx || DEFAULT_TIPOS_CX);
+  const [medicos, setMedicos] = useState(prefsCatalogs.medicos || DEFAULT_MEDICOS);
+  const [instituciones, setInstituciones] = useState(prefsCatalogs.instituciones || DEFAULT_INSTITUCIONES);
+
+  // form
+  const emptyForm = () => ({
+    fecha: dateToStr(new Date()),
+    hora: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }),
+    paciente: '', edad: '', sexo: '', tipoCx: '', medico: '', institucion: '',
+    valorBruto: '', obs: '',
+  });
+  const [formData, setFormData] = useState(emptyForm());
+  const [editingId, setEditingId] = useState(null);
+
+  const agendaRef = useRef(null);
+
+  // persist prefs
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    Object.entries(colors).forEach(([k, v]) => document.documentElement.style.setProperty(`--${k}-color`, v));
+    document.documentElement.style.setProperty('--app-zoom', zoom);
+    savePrefs({ theme, colors, zoom, catalogs: { tiposCx, medicos, instituciones } });
+  }, [theme, colors, zoom, tiposCx, medicos, instituciones]);
+
+  // auth listener
+  useEffect(() => {
+    let mounted = true;
+    if (!supabase?.auth) return;
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (mounted) setUser(session?.user || null);
+    }).catch(() => {});
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => {
+      setUser(session?.user || null);
+    });
+    return () => { mounted = false; sub?.subscription?.unsubscribe(); };
+  }, []);
+
+  // handlers
+  const gotoAgenda = () => {
+    setAgendaExpanded(true);
+    setTimeout(() => agendaRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+  };
+
+  const handleGoogle = async () => {
+    setAuthLoading(true); setAuthError('');
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: { redirectTo: window.location.origin },
+      });
+      if (error) throw error;
+    } catch (e) { setAuthError(e.message || 'Error al vincular con Google'); }
+    finally { setAuthLoading(false); }
+  };
+
+  const handleEmailLogin = async (email, password) => {
+    setAuthLoading(true); setAuthError('');
+    try {
+      let res = await supabase.auth.signInWithPassword({ email, password });
+      if (res.error && res.error.message.toLowerCase().includes('invalid')) {
+        res = await supabase.auth.signUp({ email, password });
+      }
+      if (res.error) throw res.error;
+      setLoginOpen(false);
+    } catch (e) { setAuthError(e.message || 'Error de autenticacion'); }
+    finally { setAuthLoading(false); }
+  };
+
+  const handleLogout = async () => {
+    try { await supabase.auth.signOut(); } catch {}
+    setUser(null); setLoginOpen(false);
+  };
+
+  const openNewRegistro = (dateStr) => {
+    setEditingId(null);
+    setFormData({ ...emptyForm(), fecha: dateStr || dateToStr(new Date()) });
+    setRegistroFlipped(true);
+    document.getElementById('card-registro')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  };
+
+  const submitRegistro = () => {
+    updateData((prev) => {
+      const next = { ...prev };
+      if (editingId) {
+        next.records = prev.records.map((r) => r.id === editingId ? { ...r, ...formData } : r);
+      } else {
+        next.records = [...prev.records, { id: uid(), ...formData, deleted: false, created_at: new Date().toISOString() }];
+      }
+      return next;
+    });
+    setRegistroFlipped(false);
+    setEditingId(null);
+    setFormData(emptyForm());
+  };
+
+  const editRecord = (r) => {
+    setEditingId(r.id);
+    setFormData({ ...emptyForm(), ...r });
+    setRegistroFlipped(true);
+    setSelectedDay(null);
+    document.getElementById('card-registro')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  };
+
+  const deleteRecord = (id) => updateData((p) => ({ ...p, records: p.records.map((r) => r.id === id ? { ...r, deleted: true } : r) }));
+  const restoreRecord = (id) => updateData((p) => ({ ...p, records: p.records.map((r) => r.id === id ? { ...r, deleted: false } : r) }));
+
+  const addNote = (dateStr, note) => updateData((p) => ({ ...p, notes: { ...p.notes, [dateStr]: [...(p.notes[dateStr] || []), note] } }));
+  const removeNote = (dateStr, noteId) => updateData((p) => ({ ...p, notes: { ...p.notes, [dateStr]: (p.notes[dateStr] || []).filter((n) => n.id !== noteId) } }));
+  const setJornada = (dateStr, kind) => updateData((p) => ({ ...p, jornadas: { ...p.jornadas, [dateStr]: kind } }));
+
+  const selectedDayRecords = useMemo(() => selectedDay ? records.filter((r) => r.fecha === selectedDay) : [], [records, selectedDay]);
+
+  return (
+    <div className="app-shell" style={{ '--app-zoom': zoom }}>
+      <Navbar
+        eyeOpen={eyeOpen}
+        toggleEye={() => setEyeOpen((v) => !v)}
+        onGotoAgenda={gotoAgenda}
+        loginOpen={loginOpen}
+        toggleLogin={() => setLoginOpen((v) => !v)}
+        user={user}
+      />
+
+      <EyeMenu
+        open={eyeOpen}
+        onClose={() => setEyeOpen(false)}
+        colors={colors}
+        setColors={setColors}
+        theme={theme}
+        setTheme={setTheme}
+        zoom={zoom}
+        setZoom={setZoom}
+        onShowAbout={() => { setEyeOpen(false); setShowAbout(true); }}
+        onShowHelp={() => { setEyeOpen(false); setShowHelp(true); }}
+      />
+
+      <LoginDropdown
+        open={loginOpen}
+        onClose={() => setLoginOpen(false)}
+        user={user}
+        onLogout={handleLogout}
+        onGoogle={handleGoogle}
+        onEmailLogin={handleEmailLogin}
+        loading={authLoading}
+        error={authError}
+      />
+
+      <main className="main-content" style={{ transform: `scale(${zoom})`, transformOrigin: 'top center' }}>
+        <section className="hero">
+          <h1>Bienvenido a tu <span className="grad">Agenda Quirurgica</span></h1>
+          <p>Registra cirugias, visualiza la agenda semanal o mensual y calcula tus honorarios con retencion automatica del {(TAX_RATE * 100).toFixed(2)}%.</p>
+        </section>
+
+        <section className={`grid-4 ${agendaExpanded ? 'agenda-mode' : ''}`} ref={agendaRef}>
+          {/* CARD 1 - Registro */}
+          <div id="card-registro" className="grid-slot slot-tl">
+            <FlipCard
+              flipped={registroFlipped}
+              front={
+                <div className="card front-card">
+                  <div className="card-icon"><Stethoscope size={28} /></div>
+                  <h3>Iniciar registro</h3>
+                  <p>Agrega una nueva cirugia con paciente, monto, fecha, hora y mas.</p>
+                  <button className="btn-primary big" onClick={() => openNewRegistro()}>
+                    <Plus size={18} /> Nuevo registro
+                  </button>
                 </div>
-                <div className="col-lg-5 text-lg-end mt-4 mt-lg-0 border-lg-start ps-lg-5">
-                  <span className="text-muted-fix fw-bold small">MONTO NETO LIQUIDO</span>
-                  <h2 className="display-5 fw-bold text-success mt-2">${statsPeriodo.liquido.toLocaleString(undefined, {maximumFractionDigits: 0})}</h2>
-                  <div className="badge bg-danger bg-opacity-10 text-danger p-2 px-3 rounded-pill fw-bold">Retencion Automatica ({(TAX_RATE*100).toFixed(2)}%): -${statsPeriodo.retencion.toLocaleString(undefined, {maximumFractionDigits: 0})}</div>
-                  
-                  <div className="d-flex gap-2 mt-4">
-                    <button onClick={() => exportToExcel(statsPeriodo.filteredRecords, `Reporte_${selectedAnalysisDate.getMonth()+1}_${selectedAnalysisDate.getFullYear()}`)} className="btn btn-outline-success btn-sm flex-grow-1 rounded-pill fw-bold"><FileSpreadsheet size={16} className="me-1"/> Excel</button>
-                    <button onClick={() => exportToPDF(statsPeriodo, selectedAnalysisDate)} className="btn btn-outline-danger btn-sm flex-grow-1 rounded-pill fw-bold"><FileText size={16} className="me-1"/> Plantilla PDF</button>
-                  </div>
+              }
+              back={
+                <div className="card back-card">
+                  <RegistroForm
+                    data={formData}
+                    setData={setFormData}
+                    onCancel={() => { setRegistroFlipped(false); setEditingId(null); }}
+                    onSubmit={submitRegistro}
+                    tiposCx={tiposCx} setTiposCx={setTiposCx}
+                    medicos={medicos} setMedicos={setMedicos}
+                    instituciones={instituciones} setInstituciones={setInstituciones}
+                    editingId={editingId}
+                  />
                 </div>
-              </div>
-            </div>
-
-            <div className="mt-5">
-              <div className="d-flex align-items-center gap-2 mb-3">
-                <Trash2 className="text-danger" size={20}/>
-                <h5 className="fw-bold m-0 text-contrast-fix">Papelera de Reciclaje</h5>
-              </div>
-              <div className="glass-card p-3 p-md-4 shadow-sm">
-                {trashedRecords.length === 0 ? (
-                   <p className="text-muted small m-0 text-center py-3">La papelera esta vacia.</p>
-                ) : (
-                  <div className="table-responsive">
-                    <table className={`table ${darkMode ? 'table-dark' : 'table-light'} table-hover align-middle mb-0`}>
-                      <thead>
-                        <tr className="small text-muted">
-                          <th>PACIENTE</th>
-                          <th>FECHA</th>
-                          <th>VALOR BRUTO</th>
-                          <th className="text-end">ACCIONES</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {trashedRecords.map(r => (
-                          <tr key={r.id}>
-                            <td className="fw-bold text-start">{r.paciente}</td>
-                            <td className="text-start">{r.fecha}</td>
-                            <td className="text-start">${Number(r.valorBruto).toLocaleString()}</td>
-                            <td className="text-end">
-                              <button onClick={() => restoreRecord(r.id)} title="Restaurar" className="btn btn-sm btn-outline-success rounded-circle me-2"><RotateCcw size={14}/></button>
-                              <button onClick={() => softDelete(r.id)} title="Eliminar Permanente" className="btn btn-sm btn-outline-danger rounded-circle"><Trash2 size={14}/></button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
-            </div>
+              }
+            />
           </div>
-        )}
 
-        {currentView === 'history' && (
-          <div className="animate-fade text-start">
-            <div className="d-flex flex-column flex-lg-row justify-content-between align-items-start align-items-lg-center mb-4 gap-3">
-              <h2 className="fw-bold text-contrast-fix m-0">Historial</h2>
-              <div className="d-flex flex-wrap gap-2 w-100 w-lg-auto">
-                <div className="position-relative flex-grow-1" style={{ minWidth: '250px' }}>
-                  <Search className="position-absolute top-50 start-0 translate-middle-y ms-3" style={{ color: 'var(--text-muted)' }} size={18} />
-                  <input type="text" className="form-control ps-5 rounded-pill" placeholder="Buscar por paciente, clinica, medico..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+          {/* CARD 2 - Agenda */}
+          <div className="grid-slot slot-tr">
+            <FlipCard
+              flipped={agendaExpanded}
+              front={
+                <div className="card front-card">
+                  <div className="card-icon"><CalendarIcon size={28} /></div>
+                  <h3>Revisar agenda</h3>
+                  <p>Visualiza por semana o mes. Bloques de 24 horas, jornadas y notas.</p>
+                  <button className="btn-primary big" onClick={() => setAgendaExpanded(true)}>
+                    <CalendarIcon size={18} /> Abrir agenda
+                  </button>
                 </div>
-                <button onClick={() => { setSearchTerm(''); setDateRange({start:'', end:''}) }} className="btn rounded-pill fw-bold" style={{ backgroundColor: darkMode ? 'transparent' : 'var(--bg-card)', color: 'var(--text-muted)', borderColor: 'var(--border-color)', borderWidth: '1px', borderStyle: 'solid' }}>Limpiar</button>
-              </div>
-            </div>
-
-            <div className="glass-card p-3 mb-4 shadow-sm border-0 d-flex flex-wrap align-items-center gap-3" style={{ backgroundColor: darkMode ? 'rgba(108,117,125,0.1)' : 'var(--bg-card)' }}>
-              <div className="d-flex align-items-center gap-2">
-                <Filter size={16} className="text-primary"/>
-                <span className="small fw-bold text-muted-fix">RANGO DE FECHAS:</span>
-              </div>
-              <div className="d-flex align-items-center gap-2">
-                <input type="date" className="form-control form-control-sm rounded-pill" value={dateRange.start} onChange={e => setDateRange({...dateRange, start: e.target.value})} />
-                <ArrowRight size={14} style={{ color: 'var(--text-muted)' }} />
-                <input type="date" className="form-control form-control-sm rounded-pill" value={dateRange.end} onChange={e => setDateRange({...dateRange, end: e.target.value})} />
-              </div>
-              <div className="ms-auto">
-                <span className="badge bg-primary rounded-pill px-3">{filteredHistory.length} registros</span>
-              </div>
-            </div>
-
-            <div className="row g-4">
-              {filteredHistory.length === 0 ? (
-                <div className="col-12 text-center py-5"><ClipboardList size={60} className="text-muted opacity-25 mb-3" /><p className="text-muted-fix h5">No hay registros que coincidan.</p></div>
-              ) : (
-                filteredHistory.map(r => {
-                  const f = calculateFinance(r.valorBruto);
-                  return (
-                    <div className="col-md-6 col-xl-4" key={r.id}>
-                      <div className={`card h-100 shadow-sm border-0 ${darkMode ? 'bg-dark border-secondary' : 'bg-white'}`} style={{ borderRadius: '20px' }}>
-                        <div className="card-body p-4">
-                          <div className="d-flex justify-content-between mb-2">
-                            <span className="badge bg-primary bg-opacity-10 text-primary py-2 px-3 fw-bold rounded-pill">{r.fecha}</span>
-                            <span className="text-muted small">#{r.id.split('-')[1].slice(-4)}</span>
-                          </div>
-                          <h5 className="fw-bold text-contrast-fix mb-1 text-start">{r.paciente}</h5>
-                          <p className="text-primary small mb-1 fw-bold text-start">{r.tipoCx}</p>
-                          <div className="record-tags mb-2">
-                            {r.tecnica && <span className="badge bg-accent bg-opacity-10 text-accent me-1 mb-1">{r.tecnica}</span>}
-                            {r.zonaCuerpo && <span className="badge bg-secondary bg-opacity-10 text-secondary me-1 mb-1">{r.zonaCuerpo}</span>}
-                          </div>
-                          {r.medico && <p className="text-info small mb-3 fw-bold text-start"><Stethoscope size={12} className="me-1"/>{r.medico}</p>}
-                          <div className="p-3 rounded-4 mb-3" style={{ backgroundColor: darkMode ? 'rgba(108,117,125,0.1)' : 'var(--bg-card-alt)' }}>
-                            <div className="d-flex justify-content-between small text-start"><span>Bruto:</span><span className="fw-bold text-contrast-fix">${f.bruto.toLocaleString()}</span></div>
-                            <div className="d-flex justify-content-between small text-success fw-bold mt-1 text-start"><span>Neto ({(100 - TAX_RATE*100).toFixed(2)}%):</span><span>${f.liquido.toLocaleString(undefined, {maximumFractionDigits:0})}</span></div>
-                          </div>
-                          <div className="d-flex justify-content-between align-items-center">
-                            <span className="small text-muted-fix text-start"><MapPin size={12} className="me-1"/>{r.institucion}</span>
-                            <div className="d-flex gap-1">
-                              <button onClick={() => { setFormData(r); setEditingId(r.id); setView('form'); }} className="btn btn-sm btn-outline-primary rounded-circle p-2"><Edit3 size={16}/></button>
-                              <button onClick={() => softDelete(r.id)} className="btn btn-sm btn-outline-danger rounded-circle p-2"><Trash2 size={16}/></button>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
+              }
+              back={
+                <div className="card back-card no-pad">
+                  <AgendaPanel
+                    records={records}
+                    notes={notes}
+                    jornadas={jornadas}
+                    onSelectDay={setSelectedDay}
+                    onAddDay={openNewRegistro}
+                    onMinimize={() => setAgendaExpanded(false)}
+                  />
+                </div>
+              }
+            />
           </div>
-        )}
 
-        {currentView === 'home' && (
-          <div className="text-center py-5 animate-fade">
-            <h1 className="display-4 fw-bold text-contrast-fix mb-3">SurgiTask <span className="text-primary">Pro</span></h1>
-            <p className="lead text-muted-fix mb-5">Planner Profesional - Gestion de Honorarios e Impuestos Quirurgicos.</p>
-            <div className="row justify-content-center g-4 px-2">
-              {[ { v: 'form', i: <PlusCircle size={40}/>, t: 'Registrar Cx', c: 'text-primary' }, 
-                 { v: 'calendar', i: <CalendarIcon size={40}/>, t: 'Ver Agenda', c: 'text-info' },
-                 { v: 'history', i: <ClipboardList size={40}/>, t: 'Historial', c: 'text-success' },
-                 { v: 'dashboard', i: <TrendingUp size={40}/>, t: 'Reporte Mensual', c: 'text-warning' }
-              ].map(item => (
-                <div key={item.v} className="col-6 col-md-3">
-                  <div onClick={() => setView(item.v)} className="card p-4 glass-card h-100 cursor-pointer shadow-sm border-0 border-hover">
-                    <div className={item.c + " mx-auto mb-3"}>{item.i}</div>
-                    <h6 className="fw-bold text-contrast-fix">{item.t}</h6>
+          {/* CARD 3 - Reportes */}
+          <div className="grid-slot slot-bl">
+            <FlipCard
+              flipped={reportesFlipped}
+              front={
+                <div className="card front-card">
+                  <div className="card-icon"><TrendingUp size={28} /></div>
+                  <h3>Reportes y descargas</h3>
+                  <p>Ingresos por semana, mes, 2 meses o personalizado. Retencion {(TAX_RATE * 100).toFixed(2)}%.</p>
+                  <div className="card-actions-row">
+                    <button className="btn-primary big" onClick={() => setReportesFlipped(true)}>
+                      <Download size={18} /> Ver reportes
+                    </button>
+                    <button className="btn-ghost" onClick={() => setShowCalculator(true)}><CalcIcon size={16} /> Calculadora</button>
                   </div>
                 </div>
-              ))}
-            </div>
+              }
+              back={
+                <div className="card back-card">
+                  <div className="back-head">
+                    <h3><TrendingUp size={18} /> Reportes</h3>
+                    <button className="icon-btn" onClick={() => setReportesFlipped(false)}><X size={18} /></button>
+                  </div>
+                  <ReportesPanel records={records} />
+                </div>
+              }
+            />
           </div>
-        )}
 
+          {/* CARD 4 - Historial */}
+          <div className="grid-slot slot-br">
+            <FlipCard
+              flipped={historialFlipped}
+              front={
+                <div className="card front-card">
+                  <div className="card-icon"><Receipt size={28} /></div>
+                  <h3>Historial</h3>
+                  <p>Busca registros por paciente, cirujano, institucion o fecha. Papelera con restauracion.</p>
+                  <button className="btn-primary big" onClick={() => setHistorialFlipped(true)}>
+                    <Filter size={18} /> Abrir historial
+                  </button>
+                </div>
+              }
+              back={
+                <div className="card back-card">
+                  <div className="back-head">
+                    <h3><Receipt size={18} /> Historial</h3>
+                    <button className="icon-btn" onClick={() => setHistorialFlipped(false)}><X size={18} /></button>
+                  </div>
+                  <HistorialPanel
+                    records={records}
+                    onEdit={editRecord}
+                    onDelete={deleteRecord}
+                    onRestore={restoreRecord}
+                    onView={setViewRecord}
+                  />
+                </div>
+              }
+            />
+          </div>
+        </section>
+
+        <footer className="app-footer">
+          <span>Agenda Quirurgica</span> · <span>Hecho por Diego Roman</span> · <span>IEI-IA &copy; 2026</span> · <span>Derechos reservados</span>
+        </footer>
       </main>
 
-      <footer className="py-4 mt-auto border-top" style={{ backgroundColor: 'var(--bg-nav)', borderColor: darkMode ? 'var(--border-secondary)' : 'var(--navbar-border)' }}>
-        <div className="container text-center">
-          <p className="small text-muted-fix mb-0 fw-bold opacity-75">SurgiTask Pro - desarrollado por Diego Roman Developer - Todos los derechos reservados 2026</p>
-        </div>
-      </footer>
+      {selectedDay && (
+        <DayModal
+          dateStr={selectedDay}
+          records={selectedDayRecords}
+          notes={notes[selectedDay] || []}
+          jornada={jornadas[selectedDay] || 'ninguna'}
+          onClose={() => setSelectedDay(null)}
+          onDelete={deleteRecord}
+          onRestore={restoreRecord}
+          onEdit={editRecord}
+          onAddNote={addNote}
+          onUpdateNote={removeNote}
+          onSetJornada={setJornada}
+          onAdd={openNewRegistro}
+        />
+      )}
+
+      {showCalculator && <CalculatorModal onClose={() => setShowCalculator(false)} />}
+
+      {showAbout && (
+        <InfoModal title="Acerca de" onClose={() => setShowAbout(false)}>
+          <p><b>Agenda Quirurgica</b></p>
+          <p>Planner profesional para cirujanos. Registra cirugias, gestiona la agenda y calcula tus honorarios netos con la retencion de impuesto Chile {new Date().getFullYear()} ({(TAX_RATE * 100).toFixed(2)}%).</p>
+          <hr />
+          <p>Hecho por <b>Diego Roman</b></p>
+          <p>IEI-IA &copy; 2026 · Todos los derechos reservados.</p>
+        </InfoModal>
+      )}
+
+      {showHelp && (
+        <InfoModal title="Como se usa la app" onClose={() => setShowHelp(false)}>
+          <ol className="help-list">
+            <li><b>Iniciar registro</b> (arriba izq.): el grid gira y muestra el formulario. Completa paciente, fecha, hora, monto y guarda — vuelve a su posicion.</li>
+            <li><b>Revisar agenda</b> (arriba der.): se expande al body. Eligo entre <b>Semana</b> o <b>Mes</b>. Click en un dia abre el modal con cirugias, jornada y notas.</li>
+            <li><b>Reportes y descargas</b> (abajo izq.): elige rango (semana, mes, 2 meses, 3 meses, anio, personalizado) y descarga CSV o imprime PDF.</li>
+            <li><b>Historial</b> (abajo der.): filtra por columna (paciente, cirugia, cirujano, institucion, fecha). Eliminar manda a papelera con opcion de restaurar.</li>
+            <li>El icono <b>ojo</b> abre el menu: colores, claro/oscuro, zoom, acerca de y esta ayuda.</li>
+            <li>El boton <b>Iniciar sesion</b> permite vincular tu Gmail por Google OAuth (mas seguro). Tambien funciona sin login (datos en este dispositivo).</li>
+          </ol>
+        </InfoModal>
+      )}
+
+      {viewRecord && (
+        <InfoModal title="Detalle de cirugia" onClose={() => setViewRecord(null)}>
+          <dl className="detail-dl">
+            <dt>Fecha</dt><dd>{viewRecord.fecha} {viewRecord.hora}</dd>
+            <dt>Paciente</dt><dd>{viewRecord.paciente} {viewRecord.edad && `(${viewRecord.edad} a, ${viewRecord.sexo})`}</dd>
+            <dt>Cirugia</dt><dd>{viewRecord.tipoCx}</dd>
+            <dt>Cirujano</dt><dd>{viewRecord.medico}</dd>
+            <dt>Institucion</dt><dd>{viewRecord.institucion}</dd>
+            <dt>Bruto</dt><dd>{fmtMoney(viewRecord.valorBruto)}</dd>
+            <dt>Retencion</dt><dd>-{fmtMoney(calcFinance(viewRecord.valorBruto).retencion)}</dd>
+            <dt>Liquido</dt><dd className="pos"><b>{fmtMoney(calcFinance(viewRecord.valorBruto).liquido)}</b></dd>
+            {viewRecord.obs && (<><dt>Observaciones</dt><dd>{viewRecord.obs}</dd></>)}
+          </dl>
+        </InfoModal>
+      )}
     </div>
   );
 }
