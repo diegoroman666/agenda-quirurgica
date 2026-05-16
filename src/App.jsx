@@ -2,9 +2,10 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Eye, EyeOff, Calendar as CalendarIcon, LogIn, LogOut, User,
   Palette, Sun, Moon, ZoomIn, Info, HelpCircle, X, Plus, Trash2,
-  RotateCcw, Calculator as CalcIcon, Download, FileSpreadsheet, FileText,
+  RotateCcw, Calculator as CalcIcon, FileSpreadsheet, FileText,
   ChevronLeft, ChevronRight, Search, Filter, Edit3, Save, StickyNote,
-  Clock, Stethoscope, Building2, Scissors, Receipt, TrendingUp, Loader2
+  Clock, Stethoscope, Receipt, TrendingUp, Loader2,
+  Upload, CalendarClock, Tag, ChevronDown
 } from 'lucide-react';
 import './App.css';
 import { supabase } from './supabase';
@@ -30,6 +31,22 @@ const JORNADA_COLORS = {
   extendida: '#fecaca',
   guardia: '#c7d2fe',
 };
+const LABEL_COLORS = [
+  { v: '#0d6efd', n: 'Azul' },
+  { v: '#28a745', n: 'Verde' },
+  { v: '#dc3545', n: 'Rojo' },
+  { v: '#fd7e14', n: 'Naranja' },
+  { v: '#6f42c1', n: 'Violeta' },
+  { v: '#20c997', n: 'Turquesa' },
+  { v: '#e83e8c', n: 'Rosa' },
+  { v: '#6c757d', n: 'Gris' },
+];
+const THEMES = [
+  { name: 'Clinico', primary: '#0d6efd', accent: '#17a2b8' },
+  { name: 'Esmeralda', primary: '#10b981', accent: '#14b8a6' },
+  { name: 'Coral', primary: '#f43f5e', accent: '#fb923c' },
+  { name: 'Violeta', primary: '#8b5cf6', accent: '#ec4899' },
+];
 
 const STORAGE = {
   data: 'agenda-quirurgica-data-v1',
@@ -62,10 +79,16 @@ const savePrefs = (p) => localStorage.setItem(STORAGE.prefs, JSON.stringify(p));
 
 // ---------- Eye Menu ----------
 function EyeMenu({ open, onClose, colors, setColors, theme, setTheme, zoom, setZoom, onShowAbout, onShowHelp }) {
-  const handleColor = (k, v) => {
-    const next = { ...colors, [k]: v };
+  const applyTheme = (t) => {
+    const next = { ...colors, primary: t.primary, accent: t.accent };
     setColors(next);
-    document.documentElement.style.setProperty(`--${k}-color`, v);
+    document.documentElement.style.setProperty('--primary-color', t.primary);
+    document.documentElement.style.setProperty('--accent-color', t.accent);
+  };
+  const setPrimary = (v) => {
+    const next = { ...colors, primary: v };
+    setColors(next);
+    document.documentElement.style.setProperty('--primary-color', v);
   };
   return (
     <>
@@ -77,18 +100,22 @@ function EyeMenu({ open, onClose, colors, setColors, theme, setTheme, zoom, setZ
         </div>
 
         <section className="eye-section">
-          <div className="eye-section-title"><Palette size={14} /> Personalizar colores</div>
-          <div className="color-grid">
-            {Object.entries(colors).map(([k, v]) => (
-              <label key={k} className="color-cell">
-                <input type="color" value={v} onChange={(e) => handleColor(k, e.target.value)} />
-                <span>{k}</span>
-              </label>
+          <div className="eye-section-title"><Palette size={14} /> Tema de color</div>
+          <div className="theme-swatches">
+            {THEMES.map((t) => (
+              <button key={t.name} type="button" className={`theme-swatch ${colors.primary === t.primary ? 'on' : ''}`}
+                style={{ background: `linear-gradient(135deg, ${t.primary}, ${t.accent})` }}
+                onClick={() => applyTheme(t)} title={t.name} aria-label={t.name} />
             ))}
           </div>
-          <button className="btn-ghost full" onClick={() => { setColors(DEFAULT_COLORS); Object.entries(DEFAULT_COLORS).forEach(([k, v]) => document.documentElement.style.setProperty(`--${k}-color`, v)); }}>
-            <RotateCcw size={14} /> Restaurar
-          </button>
+          <details className="eye-advanced">
+            <summary><ChevronDown size={12} /> Personalizar color principal</summary>
+            <div className="color-picker-line">
+              <input type="color" value={colors.primary} onChange={(e) => setPrimary(e.target.value)} />
+              <span>{colors.primary.toUpperCase()}</span>
+              <button type="button" className="btn-ghost sm" onClick={() => applyTheme(THEMES[0])}><RotateCcw size={12} /></button>
+            </div>
+          </details>
         </section>
 
         <section className="eye-section">
@@ -126,52 +153,69 @@ function EyeMenu({ open, onClose, colors, setColors, theme, setTheme, zoom, setZ
 }
 
 // ---------- Login dropdown ----------
-function LoginDropdown({ open, onClose, user, onLogout, onGoogle, onEmailLogin, loading, error }) {
+function LoginDropdown({ open, onClose, user, onLogout, onGoogle, onEmail, loading, error, info }) {
   const [mode, setMode] = useState('main'); // main | email
+  const [action, setAction] = useState('signin'); // signin | signup
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
-  useEffect(() => { if (!open) { setMode('main'); setEmail(''); setPassword(''); } }, [open]);
+  useEffect(() => { if (!open) { setMode('main'); setAction('signin'); setEmail(''); setPassword(''); } }, [open]);
 
   if (!open) return null;
   return (
     <>
       <div className="login-backdrop" onClick={onClose} />
-      <div className="login-pop">
+      <div className="login-pop" role="dialog" aria-label="Iniciar sesion">
+        <div className="login-pop-head">
+          <h4>{user ? 'Tu cuenta' : 'Iniciar sesion'}</h4>
+          <button className="icon-btn" onClick={onClose}><X size={16} /></button>
+        </div>
+
         {user ? (
           <>
             <div className="login-head">
               <div className="login-avatar"><User size={18} /></div>
-              <div>
+              <div className="login-meta">
                 <div className="login-name">{user.email}</div>
-                <small>Sesion activa</small>
+                <small className="muted">Sesion activa · Supabase Auth</small>
               </div>
             </div>
             <button className="btn-danger full" onClick={onLogout}><LogOut size={16} /> Cerrar sesion</button>
           </>
         ) : mode === 'main' ? (
           <>
-            <h4>Iniciar sesion</h4>
-            <p className="muted small">Vincular con tu cuenta Google es la opcion mas segura (OAuth, sin contrasena local).</p>
+            <p className="muted small">Vincula tu Gmail con Google OAuth — la forma mas segura (sin contrasena local, sin riesgo de fuerza bruta).</p>
             <button className="btn-google full" onClick={onGoogle} disabled={loading}>
-              <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3c-1.6 4.6-6 8-11.3 8-6.6 0-12-5.4-12-12s5.4-12 12-12c3 0 5.8 1.1 7.9 3l5.7-5.7C34 5.1 29.3 3 24 3 12.4 3 3 12.4 3 24s9.4 21 21 21 21-9.4 21-21c0-1.2-.1-2.3-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 16 19 13 24 13c3 0 5.8 1.1 7.9 3l5.7-5.7C34 5.1 29.3 3 24 3 16.3 3 9.6 7.5 6.3 14.7z"/><path fill="#4CAF50" d="M24 45c5.2 0 9.9-2 13.4-5.2l-6.2-5.2c-2 1.4-4.5 2.4-7.2 2.4-5.3 0-9.7-3.4-11.3-8l-6.5 5C9.5 40.5 16.2 45 24 45z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4-4 5.3l6.2 5.2c-.4.4 6.5-4.7 6.5-14.5 0-1.2-.1-2.3-.4-3.5z"/></svg>
-              Continuar con Google
+              {loading ? <Loader2 size={16} className="spin" /> : (
+                <>
+                  <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3c-1.6 4.6-6 8-11.3 8-6.6 0-12-5.4-12-12s5.4-12 12-12c3 0 5.8 1.1 7.9 3l5.7-5.7C34 5.1 29.3 3 24 3 12.4 3 3 12.4 3 24s9.4 21 21 21 21-9.4 21-21c0-1.2-.1-2.3-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 16 19 13 24 13c3 0 5.8 1.1 7.9 3l5.7-5.7C34 5.1 29.3 3 24 3 16.3 3 9.6 7.5 6.3 14.7z"/><path fill="#4CAF50" d="M24 45c5.2 0 9.9-2 13.4-5.2l-6.2-5.2c-2 1.4-4.5 2.4-7.2 2.4-5.3 0-9.7-3.4-11.3-8l-6.5 5C9.5 40.5 16.2 45 24 45z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4-4 5.3l6.2 5.2c-.4.4 6.5-4.7 6.5-14.5 0-1.2-.1-2.3-.4-3.5z"/></svg>
+                  Continuar con Google
+                </>
+              )}
             </button>
             <div className="divider"><span>o</span></div>
-            <button className="btn-ghost full" onClick={() => setMode('email')}>Iniciar con correo y contrasena</button>
+            <button className="btn-ghost full" onClick={() => setMode('email')}>Usar correo y contrasena</button>
             {error && <div className="alert-err">{error}</div>}
-            <p className="muted xs">Tu sesion queda protegida por Supabase Auth (cifrado JWT + cookies httpOnly).</p>
+            {info && <div className="alert-ok">{info}</div>}
+            <p className="muted xs">Protegido por Supabase Auth (JWT + cookies httpOnly).</p>
+            <p className="muted xs"><b>Tip:</b> la app tambien funciona sin login — los datos quedan en este dispositivo.</p>
           </>
         ) : (
           <>
-            <h4>Acceso con correo</h4>
-            <form onSubmit={(e) => { e.preventDefault(); onEmailLogin(email, password); }}>
-              <input className="input" type="email" required placeholder="correo@dominio.com" value={email} onChange={(e) => setEmail(e.target.value)} />
-              <input className="input" type="password" required minLength={6} placeholder="Contrasena (min 6)" value={password} onChange={(e) => setPassword(e.target.value)} />
-              <button className="btn-primary full" disabled={loading}>{loading ? <Loader2 size={16} className="spin" /> : <><LogIn size={16} /> Entrar / Registrar</>}</button>
+            <div className="login-tabs">
+              <button className={action === 'signin' ? 'on' : ''} onClick={() => setAction('signin')}>Entrar</button>
+              <button className={action === 'signup' ? 'on' : ''} onClick={() => setAction('signup')}>Crear cuenta</button>
+            </div>
+            <form onSubmit={(e) => { e.preventDefault(); onEmail(action, email, password); }} className="login-form">
+              <input className="input" type="email" required autoComplete="email" placeholder="correo@dominio.com" value={email} onChange={(e) => setEmail(e.target.value)} />
+              <input className="input" type="password" required minLength={6} autoComplete={action === 'signin' ? 'current-password' : 'new-password'} placeholder="Contrasena (min 6 caracteres)" value={password} onChange={(e) => setPassword(e.target.value)} />
+              <button className="btn-primary full" disabled={loading}>
+                {loading ? <Loader2 size={16} className="spin" /> : <><LogIn size={16} /> {action === 'signin' ? 'Entrar' : 'Crear cuenta'}</>}
+              </button>
             </form>
             {error && <div className="alert-err">{error}</div>}
-            <button className="btn-ghost full" onClick={() => setMode('main')}>Volver</button>
+            {info && <div className="alert-ok">{info}</div>}
+            <button className="btn-ghost full" onClick={() => setMode('main')}><ChevronLeft size={14} /> Volver</button>
           </>
         )}
       </div>
@@ -308,6 +352,19 @@ function RegistroForm({ data, setData, onCancel, onSubmit, tiposCx, setTiposCx, 
           )}
         </div>
         <div className="col2">
+          <label><Tag size={12} /> Color etiqueta</label>
+          <div className="label-color-row">
+            {LABEL_COLORS.map((c) => (
+              <button key={c.v} type="button" title={c.n}
+                className={`label-color-chip ${data.colorEtiqueta === c.v ? 'on' : ''}`}
+                style={{ background: c.v }}
+                onClick={() => update('colorEtiqueta', c.v)} />
+            ))}
+            <button type="button" className={`label-color-chip none ${!data.colorEtiqueta ? 'on' : ''}`}
+              onClick={() => update('colorEtiqueta', '')} title="Sin etiqueta"><X size={12} /></button>
+          </div>
+        </div>
+        <div className="col2">
           <label>Observaciones</label>
           <textarea className="input" rows="2" placeholder="Notas opcionales..." value={data.obs} onChange={(e) => update('obs', e.target.value)} />
         </div>
@@ -322,7 +379,7 @@ function RegistroForm({ data, setData, onCancel, onSubmit, tiposCx, setTiposCx, 
 }
 
 // ---------- Day Detail Modal ----------
-function DayModal({ dateStr, records, notes, jornada, onClose, onDelete, onRestore, onEdit, onAddNote, onUpdateNote, onSetJornada, onAdd }) {
+function DayModal({ dateStr, records, notes, jornada, onClose, onDelete, onRestore, onEdit, onMove, onAddNote, onUpdateNote, onSetJornada, onAdd }) {
   const finance = useMemo(() => {
     const active = records.filter((r) => !r.deleted);
     const bruto = active.reduce((a, c) => a + (parseFloat(c.valorBruto) || 0), 0);
@@ -379,6 +436,7 @@ function DayModal({ dateStr, records, notes, jornada, onClose, onDelete, onResto
                   </div>
                   <div className="rec-money">{fmtMoney(r.valorBruto)}</div>
                   <div className="rec-actions">
+                    {!r.deleted && <button className="icon-btn" title="Mover fecha (paciente suspendido)" onClick={() => onMove(r)}><CalendarClock size={14} /></button>}
                     {!r.deleted && <button className="icon-btn" title="Editar" onClick={() => onEdit(r)}><Edit3 size={14} /></button>}
                     {r.deleted ? (
                       <button className="icon-btn ok" title="Restaurar" onClick={() => onRestore(r.id)}><RotateCcw size={14} /></button>
@@ -567,7 +625,10 @@ function AgendaPanel({ records, notes, jornadas, onSelectDay, onAddDay, onMinimi
                 </div>
                 <div className="day-events">
                   {recs.slice(0, 3).map((r) => (
-                    <div key={r.id} className="ev"><b>{r.hora}</b> {r.paciente}</div>
+                    <div key={r.id} className="ev"
+                         style={r.colorEtiqueta ? { background: r.colorEtiqueta, color: '#fff' } : undefined}>
+                      <b>{r.hora}</b> {r.paciente}
+                    </div>
                   ))}
                   {recs.length > 3 && <small>+{recs.length - 3} mas</small>}
                   {(notes[ds] || []).slice(0, 1).map((n) => (
@@ -599,7 +660,9 @@ function AgendaPanel({ records, notes, jornadas, onSelectDay, onAddDay, onMinimi
                   {Array.from({ length: 24 }, (_, h) => (
                     <div key={h} className="hour-slot" onClick={() => onSelectDay(ds)}>
                       {recs.filter((r) => parseInt(r.hora?.split(':')[0], 10) === h).map((r) => (
-                        <div key={r.id} className="ev-slot" title={`${r.paciente} · ${r.tipoCx}`}>
+                        <div key={r.id} className="ev-slot"
+                             style={r.colorEtiqueta ? { background: r.colorEtiqueta } : undefined}
+                             title={`${r.paciente} · ${r.tipoCx}`}>
                           <b>{r.hora}</b> {r.paciente}
                         </div>
                       ))}
@@ -658,18 +721,69 @@ function ReportesPanel({ records }) {
     return { bruto, retencion, liquido: bruto - retencion, count: filtered.length };
   }, [filtered]);
 
-  const downloadCSV = () => {
-    const headers = ['Fecha', 'Hora', 'Paciente', 'Cirugia', 'Cirujano', 'Institucion', 'Bruto', 'Retencion', 'Liquido'];
+  const downloadXlsx = () => {
+    if (!window.XLSX) { alert('Librerias de Excel cargando, intenta de nuevo en un segundo.'); return; }
     const rows = filtered.map((r) => {
       const f = calcFinance(r.valorBruto);
-      return [r.fecha, r.hora, r.paciente, r.tipoCx, r.medico, r.institucion, f.bruto, f.retencion.toFixed(0), f.liquido.toFixed(0)];
+      return {
+        Fecha: r.fecha, Hora: r.hora, Paciente: r.paciente,
+        Cirugia: r.tipoCx, Cirujano: r.medico, Institucion: r.institucion,
+        Edad: r.edad || '', Sexo: r.sexo || '',
+        'Bruto ($)': f.bruto, [`Retencion ${(TAX_RATE * 100).toFixed(2)}% ($)`]: Math.round(f.retencion),
+        'Liquido ($)': Math.round(f.liquido), Observaciones: r.obs || '',
+      };
     });
-    const csv = [headers, ...rows].map((row) => row.map((c) => `"${String(c ?? '').replace(/"/g, '""')}"`).join(',')).join('\n');
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = `agenda-quirurgica-${preset}.csv`; a.click();
-    URL.revokeObjectURL(url);
+    const ws = window.XLSX.utils.json_to_sheet(rows);
+    ws['!cols'] = [{ wch: 11 }, { wch: 7 }, { wch: 28 }, { wch: 22 }, { wch: 22 }, { wch: 22 }, { wch: 6 }, { wch: 10 }, { wch: 12 }, { wch: 14 }, { wch: 12 }, { wch: 30 }];
+    const wb = window.XLSX.utils.book_new();
+    window.XLSX.utils.book_append_sheet(wb, ws, 'Cirugias');
+    window.XLSX.writeFile(wb, `agenda-quirurgica-${preset}.xlsx`);
+  };
+
+  const downloadPdf = () => {
+    if (!window.jspdf) { alert('Librerias de PDF cargando, intenta de nuevo en un segundo.'); return; }
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    const periodLabel = preset === 'custom' ? `${from || '—'} a ${to || '—'}` : preset;
+    doc.setFontSize(18); doc.setTextColor(13, 110, 253);
+    doc.text('Agenda Quirurgica', 14, 18);
+    doc.setFontSize(11); doc.setTextColor(100);
+    doc.text(`Reporte ${periodLabel}`, 14, 26);
+    doc.text(`Generado: ${new Date().toLocaleString('es-CL')}`, 14, 32);
+    doc.setDrawColor(200); doc.line(14, 36, 196, 36);
+
+    doc.setFontSize(13); doc.setTextColor(0); doc.text('Resumen', 14, 46);
+    doc.setFontSize(10);
+    doc.text(`Cirugias: ${stats.count}`, 18, 54);
+    doc.text(`Bruto: ${fmtMoney(stats.bruto)}`, 18, 60);
+    doc.setTextColor(220, 53, 69);
+    doc.text(`Retencion ${(TAX_RATE * 100).toFixed(2)}%: -${fmtMoney(stats.retencion)}`, 18, 66);
+    doc.setFontSize(13); doc.setTextColor(40, 167, 69);
+    doc.text(`Liquido: ${fmtMoney(stats.liquido)}`, 18, 76);
+
+    doc.setFontSize(12); doc.setTextColor(0); doc.text('Detalle', 14, 90);
+    doc.setFillColor(240, 240, 240); doc.rect(14, 93, 182, 6, 'F');
+    doc.setFontSize(8); doc.setTextColor(60);
+    doc.text('Fecha', 16, 97); doc.text('Paciente', 40, 97);
+    doc.text('Cirugia', 86, 97); doc.text('Cirujano', 128, 97);
+    doc.text('Bruto', 165, 97); doc.text('Liquido', 182, 97);
+
+    let y = 104; doc.setTextColor(0);
+    filtered.forEach((r) => {
+      if (y > 275) { doc.addPage(); y = 20; }
+      const f = calcFinance(r.valorBruto);
+      doc.text(String(r.fecha || ''), 16, y);
+      doc.text(String(r.paciente || '').slice(0, 26), 40, y);
+      doc.text(String(r.tipoCx || '').slice(0, 22), 86, y);
+      doc.text(String(r.medico || '').slice(0, 18), 128, y);
+      doc.text(fmtMoney(f.bruto), 165, y);
+      doc.text(fmtMoney(f.liquido), 182, y);
+      y += 5;
+    });
+
+    doc.setFontSize(8); doc.setTextColor(150);
+    doc.text('Hecho por Diego Roman · IEI-IA 2026 · Derechos reservados', 14, 290);
+    doc.save(`agenda-quirurgica-${preset}.pdf`);
   };
 
   return (
@@ -695,8 +809,8 @@ function ReportesPanel({ records }) {
       </div>
 
       <div className="rep-actions">
-        <button className="btn-primary" onClick={downloadCSV}><FileSpreadsheet size={16} /> Descargar CSV</button>
-        <button className="btn-ghost" onClick={() => window.print()}><FileText size={16} /> Imprimir / PDF</button>
+        <button className="btn-primary" onClick={downloadXlsx}><FileSpreadsheet size={16} /> Descargar Excel</button>
+        <button className="btn-primary" onClick={downloadPdf} style={{ background: '#dc3545' }}><FileText size={16} /> Descargar PDF</button>
       </div>
 
       <div className="rep-list">
@@ -717,7 +831,7 @@ function ReportesPanel({ records }) {
 }
 
 // ---------- Historial ----------
-function HistorialPanel({ records, onEdit, onDelete, onRestore, onView }) {
+function HistorialPanel({ records, onEdit, onDelete, onRestore, onView, onMove }) {
   const [q, setQ] = useState('');
   const [filterCol, setFilterCol] = useState('paciente');
   const [showDeleted, setShowDeleted] = useState(false);
@@ -777,6 +891,7 @@ function HistorialPanel({ records, onEdit, onDelete, onRestore, onView }) {
                   <td className="pos">{fmtMoney(f.liquido)}</td>
                   <td className="actions">
                     <button className="icon-btn" title="Ver" onClick={() => onView(r)}><Eye size={14} /></button>
+                    {!r.deleted && <button className="icon-btn" title="Mover fecha" onClick={() => onMove(r)}><CalendarClock size={14} /></button>}
                     {!r.deleted && <button className="icon-btn" title="Editar" onClick={() => onEdit(r)}><Edit3 size={14} /></button>}
                     {r.deleted ? (
                       <button className="icon-btn ok" title="Restaurar" onClick={() => onRestore(r.id)}><RotateCcw size={14} /></button>
@@ -791,6 +906,214 @@ function HistorialPanel({ records, onEdit, onDelete, onRestore, onView }) {
         </table>
       </div>
       <small className="muted">{filtered.length} registro(s)</small>
+    </div>
+  );
+}
+
+// ---------- Move Date Modal ----------
+function MoveDateModal({ record, onSave, onClose }) {
+  const [newDate, setNewDate] = useState(record.fecha);
+  const [newTime, setNewTime] = useState(record.hora || '08:00');
+  const [reason, setReason] = useState(record.motivoMovimiento || '');
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal-card sm" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-head">
+          <h3><CalendarClock size={18} /> Reprogramar / Mover fecha</h3>
+          <button className="icon-btn" onClick={onClose}><X size={18} /></button>
+        </div>
+        <div className="move-info">
+          <span>Paciente:</span> <b>{record.paciente}</b><br />
+          <span>Cirugia:</span> <b>{record.tipoCx}</b><br />
+          <small className="muted">Actual: {record.fecha} {record.hora}</small>
+        </div>
+        <div className="reg-grid">
+          <div>
+            <label>Nueva fecha</label>
+            <input className="input" type="date" value={newDate} onChange={(e) => setNewDate(e.target.value)} />
+          </div>
+          <div>
+            <label>Nueva hora</label>
+            <input className="input" type="time" value={newTime} onChange={(e) => setNewTime(e.target.value)} />
+          </div>
+          <div className="col2">
+            <label>Motivo (opcional)</label>
+            <input className="input" placeholder="Ej: paciente suspendido, sala no disponible..." value={reason} onChange={(e) => setReason(e.target.value)} />
+          </div>
+        </div>
+        <div className="reg-actions">
+          <button className="btn-ghost" onClick={onClose}>Cancelar</button>
+          <button className="btn-primary" onClick={() => { onSave(record.id, newDate, newTime, reason); onClose(); }}>
+            <Save size={14} /> Mover fecha
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------- Importar Excel Modal ----------
+const APP_FIELDS = [
+  { k: 'paciente', l: 'Paciente', match: ['paciente', 'nombre', 'patient'], required: true },
+  { k: 'fecha', l: 'Fecha o dia', match: ['fecha', 'date', 'dia'], required: false },
+  { k: 'hora', l: 'Hora', match: ['hora', 'time', 'horario'] },
+  { k: 'tipoCx', l: 'Tipo cirugia', match: ['cirugia', 'procedimiento', 'tipo'] },
+  { k: 'medico', l: 'Cirujano', match: ['medico', 'cirujano', 'doctor', 'profesional'] },
+  { k: 'institucion', l: 'Institucion', match: ['institucion', 'clinica', 'hospital', 'lugar'] },
+  { k: 'valorBruto', l: 'Honorarios', match: ['valor', 'monto', 'honorario', 'precio', 'bruto'] },
+  { k: 'edad', l: 'Edad', match: ['edad', 'age'] },
+  { k: 'sexo', l: 'Sexo', match: ['sexo', 'genero', 'sex'] },
+];
+
+function ImportarExcelModal({ onClose, onImport }) {
+  const [fileName, setFileName] = useState('');
+  const [headers, setHeaders] = useState([]);
+  const [rows, setRows] = useState([]);
+  const [mapping, setMapping] = useState({});
+  const now = new Date();
+  const [targetMonth, setTargetMonth] = useState(`${now.getFullYear()}-${pad2(now.getMonth() + 1)}`);
+  const [parsing, setParsing] = useState(false);
+  const [err, setErr] = useState('');
+
+  const guessMap = (cols) => {
+    const m = {};
+    const lower = cols.map((c) => String(c).toLowerCase().trim());
+    APP_FIELDS.forEach((f) => {
+      const idx = lower.findIndex((c) => f.match.some((kw) => c.includes(kw)));
+      if (idx >= 0) m[f.k] = cols[idx];
+    });
+    return m;
+  };
+
+  const handleFile = async (file) => {
+    if (!file) return;
+    if (!window.XLSX) { setErr('La libreria de Excel aun no cargo, espera 1-2 segundos.'); return; }
+    setParsing(true); setErr('');
+    try {
+      const buf = await file.arrayBuffer();
+      const wb = window.XLSX.read(new Uint8Array(buf), { type: 'array', cellDates: true });
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      const json = window.XLSX.utils.sheet_to_json(sheet, { defval: '', raw: false });
+      if (!json.length) throw new Error('La hoja esta vacia.');
+      const cols = Object.keys(json[0]);
+      setHeaders(cols); setRows(json);
+      setMapping(guessMap(cols));
+      setFileName(file.name);
+    } catch (e) { setErr(e.message || 'No se pudo leer el archivo.'); }
+    finally { setParsing(false); }
+  };
+
+  const normalizeDate = (raw, ym) => {
+    const [y, m] = ym.split('-').map(Number);
+    if (!raw && raw !== 0) return `${ym}-01`;
+    const s = String(raw).trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+    if (/^\d{1,2}\/\d{1,2}\/\d{2,4}$/.test(s)) {
+      const [d, mm, yy] = s.split('/').map(Number);
+      const year = yy < 100 ? 2000 + yy : yy;
+      return `${year}-${pad2(mm)}-${pad2(d)}`;
+    }
+    if (/^\d{1,2}-\d{1,2}-\d{2,4}$/.test(s)) {
+      const [d, mm, yy] = s.split('-').map(Number);
+      const year = yy < 100 ? 2000 + yy : yy;
+      return `${year}-${pad2(mm)}-${pad2(d)}`;
+    }
+    if (/^\d{1,2}$/.test(s)) {
+      return `${y}-${pad2(m)}-${pad2(Math.min(31, parseInt(s, 10)))}`;
+    }
+    const d = new Date(s);
+    if (!isNaN(d.getTime())) return dateToStr(d);
+    return `${ym}-01`;
+  };
+
+  const normalizeTime = (raw) => {
+    if (!raw) return '08:00';
+    const s = String(raw).trim();
+    if (/^\d{1,2}:\d{2}/.test(s)) return s.slice(0, 5);
+    if (/^\d{1,2}$/.test(s)) return `${pad2(parseInt(s, 10))}:00`;
+    return '08:00';
+  };
+
+  const doImport = () => {
+    if (!rows.length) { setErr('Adjunta primero un archivo .xlsx, .xls o .csv'); return; }
+    if (!mapping.paciente) { setErr('Debes mapear al menos la columna "Paciente".'); return; }
+    const out = rows.map((row) => {
+      const rec = { id: uid(), deleted: false, created_at: new Date().toISOString(), colorEtiqueta: LABEL_COLORS[0].v };
+      APP_FIELDS.forEach((f) => { rec[f.k] = mapping[f.k] ? row[mapping[f.k]] ?? '' : ''; });
+      rec.fecha = normalizeDate(rec.fecha, targetMonth);
+      rec.hora = normalizeTime(rec.hora);
+      rec.valorBruto = String(rec.valorBruto || '').replace(/[^\d.-]/g, '');
+      return rec;
+    }).filter((r) => String(r.paciente || '').trim().length > 0);
+    if (!out.length) { setErr('Ningun registro tenia paciente valido.'); return; }
+    onImport(out, targetMonth);
+    onClose();
+  };
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-head">
+          <h3><Upload size={18} /> Importar Excel a la agenda</h3>
+          <button className="icon-btn" onClick={onClose}><X size={18} /></button>
+        </div>
+
+        <p className="muted small">Adjunta tu plantilla (.xlsx, .xls o .csv). Detectaremos las columnas y podras ajustar el mapeo antes de importarlas al mes elegido.</p>
+
+        <div className="import-step">
+          <label>1. Mes destino del calendario</label>
+          <input className="input" type="month" value={targetMonth} onChange={(e) => setTargetMonth(e.target.value)} />
+          <small className="muted">Si tu plantilla solo trae el dia (1, 2, 3...) sin mes/anio, se completa con este mes.</small>
+        </div>
+
+        <div className="import-step">
+          <label>2. Archivo</label>
+          <input className="input" type="file" accept=".xlsx,.xls,.csv" onChange={(e) => handleFile(e.target.files?.[0])} />
+          {parsing && <small className="muted"><Loader2 size={12} className="spin" /> Leyendo archivo...</small>}
+          {fileName && <small className="muted">Archivo: <b>{fileName}</b> · {rows.length} filas detectadas</small>}
+        </div>
+
+        {headers.length > 0 && (
+          <>
+            <div className="import-step">
+              <label>3. Mapear columnas → campos de la app</label>
+              <div className="map-grid">
+                {APP_FIELDS.map((f) => (
+                  <div key={f.k} className="map-row">
+                    <span>{f.l}{f.required && ' *'}</span>
+                    <select className="input" value={mapping[f.k] || ''} onChange={(e) => setMapping({ ...mapping, [f.k]: e.target.value })}>
+                      <option value="">— ignorar —</option>
+                      {headers.map((h) => <option key={h} value={h}>{h}</option>)}
+                    </select>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="import-step">
+              <label>Previsualizacion (primeras 3 filas)</label>
+              <div className="import-preview">
+                {rows.slice(0, 3).map((r, i) => (
+                  <div key={i} className="prev-row">
+                    <b>{mapping.paciente ? r[mapping.paciente] : '(sin paciente)'}</b>
+                    <small>{mapping.fecha ? normalizeDate(r[mapping.fecha], targetMonth) : `${targetMonth}-01`} {mapping.hora ? normalizeTime(r[mapping.hora]) : '08:00'}</small>
+                    <small>{mapping.tipoCx ? r[mapping.tipoCx] : ''} · {mapping.medico ? r[mapping.medico] : ''}</small>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </>
+        )}
+
+        {err && <div className="alert-err">{err}</div>}
+
+        <div className="reg-actions">
+          <button className="btn-ghost" onClick={onClose}>Cancelar</button>
+          <button className="btn-primary" onClick={doImport} disabled={!rows.length}>
+            <Upload size={14} /> Importar {rows.length || ''} registros
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -821,6 +1144,9 @@ export default function App() {
   const [historialFlipped, setHistorialFlipped] = useState(false);
   const [showCalculator, setShowCalculator] = useState(false);
   const [showAbout, setShowAbout] = useState(false);
+  const [showImportExcel, setShowImportExcel] = useState(false);
+  const [movingRecord, setMovingRecord] = useState(null);
+  const [authInfo, setAuthInfo] = useState('');
   const [showHelp, setShowHelp] = useState(false);
   const [selectedDay, setSelectedDay] = useState(null);
   const [viewRecord, setViewRecord] = useState(null);
@@ -841,7 +1167,7 @@ export default function App() {
     fecha: dateToStr(new Date()),
     hora: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }),
     paciente: '', edad: '', sexo: '', tipoCx: '', medico: '', institucion: '',
-    valorBruto: '', obs: '',
+    valorBruto: '', obs: '', colorEtiqueta: LABEL_COLORS[0].v,
   });
   const [formData, setFormData] = useState(emptyForm());
   const [editingId, setEditingId] = useState(null);
@@ -855,6 +1181,18 @@ export default function App() {
     document.documentElement.style.setProperty('--app-zoom', zoom);
     savePrefs({ theme, colors, zoom, catalogs: { tiposCx, medicos, instituciones } });
   }, [theme, colors, zoom, tiposCx, medicos, instituciones]);
+
+  // CDN libs for XLSX + PDF
+  useEffect(() => {
+    const inject = (src) => {
+      if (document.querySelector(`script[data-cdn="${src}"]`)) return;
+      const s = document.createElement('script');
+      s.src = src; s.async = true; s.dataset.cdn = src;
+      document.head.appendChild(s);
+    };
+    inject('https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js');
+    inject('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
+  }, []);
 
   // auth listener
   useEffect(() => {
@@ -887,15 +1225,19 @@ export default function App() {
     finally { setAuthLoading(false); }
   };
 
-  const handleEmailLogin = async (email, password) => {
-    setAuthLoading(true); setAuthError('');
+  const handleEmail = async (action, email, password) => {
+    setAuthLoading(true); setAuthError(''); setAuthInfo('');
     try {
-      let res = await supabase.auth.signInWithPassword({ email, password });
-      if (res.error && res.error.message.toLowerCase().includes('invalid')) {
-        res = await supabase.auth.signUp({ email, password });
+      if (action === 'signup') {
+        const { data, error } = await supabase.auth.signUp({ email, password });
+        if (error) throw error;
+        if (data.session) { setLoginOpen(false); }
+        else { setAuthInfo('Cuenta creada. Revisa tu correo para confirmar.'); }
+      } else {
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) throw error;
+        setLoginOpen(false);
       }
-      if (res.error) throw res.error;
-      setLoginOpen(false);
     } catch (e) { setAuthError(e.message || 'Error de autenticacion'); }
     finally { setAuthLoading(false); }
   };
@@ -937,6 +1279,11 @@ export default function App() {
 
   const deleteRecord = (id) => updateData((p) => ({ ...p, records: p.records.map((r) => r.id === id ? { ...r, deleted: true } : r) }));
   const restoreRecord = (id) => updateData((p) => ({ ...p, records: p.records.map((r) => r.id === id ? { ...r, deleted: false } : r) }));
+  const moveRecord = (id, newDate, newTime, motivo) => updateData((p) => ({
+    ...p,
+    records: p.records.map((r) => r.id === id ? { ...r, fecha: newDate, hora: newTime, motivoMovimiento: motivo || r.motivoMovimiento } : r),
+  }));
+  const bulkImport = (newRecords) => updateData((p) => ({ ...p, records: [...p.records, ...newRecords] }));
 
   const addNote = (dateStr, note) => updateData((p) => ({ ...p, notes: { ...p.notes, [dateStr]: [...(p.notes[dateStr] || []), note] } }));
   const removeNote = (dateStr, noteId) => updateData((p) => ({ ...p, notes: { ...p.notes, [dateStr]: (p.notes[dateStr] || []).filter((n) => n.id !== noteId) } }));
@@ -974,9 +1321,10 @@ export default function App() {
         user={user}
         onLogout={handleLogout}
         onGoogle={handleGoogle}
-        onEmailLogin={handleEmailLogin}
+        onEmail={handleEmail}
         loading={authLoading}
         error={authError}
+        info={authInfo}
       />
 
       <main className="main-content" style={{ transform: `scale(${zoom})`, transformOrigin: 'top center' }}>
@@ -994,10 +1342,15 @@ export default function App() {
                 <div className="card front-card">
                   <div className="card-icon"><Stethoscope size={28} /></div>
                   <h3>Iniciar registro</h3>
-                  <p>Agrega una nueva cirugia con paciente, monto, fecha, hora y mas.</p>
-                  <button className="btn-primary big" onClick={() => openNewRegistro()}>
-                    <Plus size={18} /> Nuevo registro
-                  </button>
+                  <p>Agrega una nueva cirugia con paciente, monto, fecha, hora, color de etiqueta y mas. O importa una plantilla Excel completa.</p>
+                  <div className="card-actions-row">
+                    <button className="btn-primary big" onClick={() => openNewRegistro()}>
+                      <Plus size={18} /> Nuevo registro
+                    </button>
+                    <button className="btn-ghost" onClick={() => setShowImportExcel(true)}>
+                      <Upload size={16} /> Importar Excel
+                    </button>
+                  </div>
                 </div>
               }
               back={
@@ -1101,6 +1454,7 @@ export default function App() {
                     onDelete={deleteRecord}
                     onRestore={restoreRecord}
                     onView={setViewRecord}
+                    onMove={setMovingRecord}
                   />
                 </div>
               }
@@ -1123,10 +1477,26 @@ export default function App() {
           onDelete={deleteRecord}
           onRestore={restoreRecord}
           onEdit={editRecord}
+          onMove={setMovingRecord}
           onAddNote={addNote}
           onUpdateNote={removeNote}
           onSetJornada={setJornada}
           onAdd={openNewRegistro}
+        />
+      )}
+
+      {movingRecord && (
+        <MoveDateModal
+          record={movingRecord}
+          onSave={moveRecord}
+          onClose={() => setMovingRecord(null)}
+        />
+      )}
+
+      {showImportExcel && (
+        <ImportarExcelModal
+          onClose={() => setShowImportExcel(false)}
+          onImport={(recs) => { bulkImport(recs); setAgendaExpanded(true); }}
         />
       )}
 
@@ -1145,11 +1515,11 @@ export default function App() {
       {showHelp && (
         <InfoModal title="Como se usa la app" onClose={() => setShowHelp(false)}>
           <ol className="help-list">
-            <li><b>Iniciar registro</b> (arriba izq.): el grid gira y muestra el formulario. Completa paciente, fecha, hora, monto y guarda — vuelve a su posicion.</li>
-            <li><b>Revisar agenda</b> (arriba der.): se expande al body. Eligo entre <b>Semana</b> o <b>Mes</b>. Click en un dia abre el modal con cirugias, jornada y notas.</li>
-            <li><b>Reportes y descargas</b> (abajo izq.): elige rango (semana, mes, 2 meses, 3 meses, anio, personalizado) y descarga CSV o imprime PDF.</li>
-            <li><b>Historial</b> (abajo der.): filtra por columna (paciente, cirugia, cirujano, institucion, fecha). Eliminar manda a papelera con opcion de restaurar.</li>
-            <li>El icono <b>ojo</b> abre el menu: colores, claro/oscuro, zoom, acerca de y esta ayuda.</li>
+            <li><b>Iniciar registro</b> (arriba izq.): el grid gira y muestra el formulario con color de etiqueta. Tambien puedes <b>Importar Excel</b> con una plantilla y mapear las columnas al mes destino.</li>
+            <li><b>Revisar agenda</b> (arriba der.): se expande al body. Elige entre <b>Semana</b> o <b>Mes</b>. Click en un dia abre el modal con cirugias, jornada, notas y boton de <b>Mover fecha</b> (para pacientes suspendidos).</li>
+            <li><b>Reportes y descargas</b> (abajo izq.): elige rango (semana, mes, 2 meses, 3 meses, anio, personalizado) y <b>Descarga Excel</b> (.xlsx) o <b>Descarga PDF</b>.</li>
+            <li><b>Historial</b> (abajo der.): filtra por columna. Acciones por fila: ver, mover fecha, editar, eliminar/restaurar.</li>
+            <li>El icono <b>ojo</b> abre el menu: tema de color (4 swatches), claro/oscuro, zoom, acerca de y esta ayuda.</li>
             <li>El boton <b>Iniciar sesion</b> permite vincular tu Gmail por Google OAuth (mas seguro). Tambien funciona sin login (datos en este dispositivo).</li>
           </ol>
         </InfoModal>
