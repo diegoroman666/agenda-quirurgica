@@ -5,6 +5,13 @@
 
 * { box-sizing: border-box; }
 
+html, body {
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: auto;
+}
+
 #root { width: 100%; max-width: 100%; margin: 0; padding: 0; }
 
 .app-shell {
@@ -15,6 +22,8 @@
   display: flex;
   flex-direction: column;
 }
+
+button { touch-action: manipulation; }
 
 /* ---------- NAVBAR ---------- */
 .navbar {
@@ -332,7 +341,6 @@ label { display: block; font-size: 0.74rem; font-weight: 700; text-transform: up
   max-width: 1400px;
   margin: 0 auto;
   width: 100%;
-  transition: transform 0.3s ease;
 }
 
 .hero { text-align: center; margin-bottom: 36px; }
@@ -361,11 +369,52 @@ label { display: block; font-size: 0.74rem; font-weight: 700; text-transform: up
 .grid-4.agenda-mode .slot-br { grid-row: 3; grid-column: 2; }
 
 @media (max-width: 820px) {
-  .grid-4 { grid-template-columns: 1fr; grid-template-rows: auto; }
+  .grid-4 {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto;
+    gap: 16px;
+  }
   .grid-4.agenda-mode .slot-tr,
   .grid-4.agenda-mode .slot-tl,
   .grid-4.agenda-mode .slot-bl,
-  .grid-4.agenda-mode .slot-br { grid-column: 1; grid-row: auto; }
+  .grid-4.agenda-mode .slot-br { grid-column: 1; grid-row: auto; min-height: auto; }
+
+  /* Mobile: kill 3D flip - it breaks touch scroll inside cards.
+     Replace with simple display toggle so cards grow to their content
+     and the whole page scrolls naturally. */
+  .grid-slot { perspective: none; min-height: auto; }
+  .flip-card {
+    height: auto;
+    min-height: auto;
+    transform-style: flat;
+  }
+  .flip-inner {
+    position: static;
+    transform: none !important;
+    transition: opacity 0.2s ease;
+    transform-style: flat;
+  }
+  .flip-face {
+    position: static;
+    inset: auto;
+    transform: none;
+    backface-visibility: visible;
+    -webkit-backface-visibility: visible;
+    overflow: visible;
+    border-radius: 22px;
+  }
+  .flip-card:not(.is-flipped) .flip-back { display: none; }
+  .flip-card.is-flipped .flip-front { display: none; }
+
+  .card { min-height: auto; }
+  .back-card { overflow: visible; max-height: none; }
+
+  /* nested scrollable regions: cap to viewport so user can still
+     scroll the page out of them */
+  .week-grid { max-height: 70vh; }
+  .hist-table-wrap { max-height: 60vh; -webkit-overflow-scrolling: touch; }
+  .rep-list { max-height: 50vh; -webkit-overflow-scrolling: touch; }
+  .modal-card { max-height: 92vh; -webkit-overflow-scrolling: touch; }
 }
 
 /* ---------- FLIP CARD ---------- */

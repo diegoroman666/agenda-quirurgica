@@ -1327,7 +1327,7 @@ export default function App() {
         info={authInfo}
       />
 
-      <main className="main-content" style={{ transform: `scale(${zoom})`, transformOrigin: 'top center' }}>
+      <main className="main-content" style={{ zoom }}>
         <section className="hero">
           <h1>Bienvenido a tu <span className="grad">Agenda Quirurgica</span></h1>
           <p>Registra cirugias, visualiza la agenda semanal o mensual y calcula tus honorarios con retencion automatica del {(TAX_RATE * 100).toFixed(2)}%.</p>
