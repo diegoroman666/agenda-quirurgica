@@ -640,38 +640,40 @@ function AgendaPanel({ records, notes, jornadas, onSelectDay, onAddDay, onMinimi
           })}
         </div>
       ) : (
-        <div className="week-grid">
-          <div className="hours-col">
-            <div className="dow-spacer" />
-            {Array.from({ length: 24 }, (_, h) => <div key={h} className="hour-cell">{pad2(h)}:00</div>)}
+        <div className="week-scroll">
+          <div className="week-grid">
+            <div className="hours-col">
+              <div className="dow-spacer" />
+              {Array.from({ length: 24 }, (_, h) => <div key={h} className="hour-cell">{pad2(h)}:00</div>)}
+            </div>
+            {weekDays.map((ds) => {
+              const d = parseDate(ds);
+              const recs = recordsByDay[ds] || [];
+              const jornada = jornadas[ds];
+              return (
+                <div key={ds} className={`week-col ${ds === todayStr ? 'today' : ''}`}>
+                  <div className="week-col-head" onClick={() => onSelectDay(ds)}>
+                    <small>{d.toLocaleDateString('es-CL', { weekday: 'short' })}</small>
+                    <b>{d.getDate()}</b>
+                    <button className="add-mini" onClick={(e) => { e.stopPropagation(); onAddDay(ds); }}><Plus size={12} /></button>
+                  </div>
+                  <div className="hours-wrap" style={{ background: jornada && jornada !== 'ninguna' ? JORNADA_COLORS[jornada] : undefined }}>
+                    {Array.from({ length: 24 }, (_, h) => (
+                      <div key={h} className="hour-slot" onClick={() => onSelectDay(ds)}>
+                        {recs.filter((r) => parseInt(r.hora?.split(':')[0], 10) === h).map((r) => (
+                          <div key={r.id} className="ev-slot"
+                               style={r.colorEtiqueta ? { background: r.colorEtiqueta } : undefined}
+                               title={`${r.paciente} · ${r.tipoCx}`}>
+                            <b>{r.hora}</b> {r.paciente}
+                          </div>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
           </div>
-          {weekDays.map((ds) => {
-            const d = parseDate(ds);
-            const recs = recordsByDay[ds] || [];
-            const jornada = jornadas[ds];
-            return (
-              <div key={ds} className={`week-col ${ds === todayStr ? 'today' : ''}`}>
-                <div className="week-col-head" onClick={() => onSelectDay(ds)}>
-                  <small>{d.toLocaleDateString('es-CL', { weekday: 'short' })}</small>
-                  <b>{d.getDate()}</b>
-                  <button className="add-mini" onClick={(e) => { e.stopPropagation(); onAddDay(ds); }}><Plus size={12} /></button>
-                </div>
-                <div className="hours-wrap" style={{ background: jornada && jornada !== 'ninguna' ? JORNADA_COLORS[jornada] : undefined }}>
-                  {Array.from({ length: 24 }, (_, h) => (
-                    <div key={h} className="hour-slot" onClick={() => onSelectDay(ds)}>
-                      {recs.filter((r) => parseInt(r.hora?.split(':')[0], 10) === h).map((r) => (
-                        <div key={r.id} className="ev-slot"
-                             style={r.colorEtiqueta ? { background: r.colorEtiqueta } : undefined}
-                             title={`${r.paciente} · ${r.tipoCx}`}>
-                          <b>{r.hora}</b> {r.paciente}
-                        </div>
-                      ))}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            );
-          })}
         </div>
       )}
     </div>
