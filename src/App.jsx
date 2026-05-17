@@ -1179,6 +1179,9 @@ export default function App() {
     document.documentElement.setAttribute('data-theme', theme);
     Object.entries(colors).forEach(([k, v]) => document.documentElement.style.setProperty(`--${k}-color`, v));
     document.documentElement.style.setProperty('--app-zoom', zoom);
+    // Zoom a nivel body: ajusta layout y scroll bounds en Chromium, Safari y Firefox modernos
+    if (zoom === 1) document.body.style.removeProperty('zoom');
+    else document.body.style.zoom = String(zoom);
     savePrefs({ theme, colors, zoom, catalogs: { tiposCx, medicos, instituciones } });
   }, [theme, colors, zoom, tiposCx, medicos, instituciones]);
 
@@ -1327,7 +1330,7 @@ export default function App() {
         info={authInfo}
       />
 
-      <main className="main-content" style={{ zoom }}>
+      <main className="main-content">
         <section className="hero">
           <h1>Bienvenido a tu <span className="grad">Agenda Quirurgica</span></h1>
           <p>Registra cirugias, visualiza la agenda semanal o mensual y calcula tus honorarios con retencion automatica del {(TAX_RATE * 100).toFixed(2)}%.</p>
