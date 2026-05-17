@@ -1,11 +1,11 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useLayoutEffect } from 'react';
 import {
   Eye, EyeOff, Calendar as CalendarIcon, LogIn, LogOut, User,
   Palette, Sun, Moon, ZoomIn, Info, HelpCircle, X, Plus, Trash2,
   RotateCcw, Calculator as CalcIcon, Download, FileSpreadsheet, FileText,
   ChevronLeft, ChevronRight, Search, Filter, Edit3, Save, StickyNote,
   Clock, Stethoscope, Receipt, TrendingUp, Loader2,
-  Upload, CalendarClock, Tag, ChevronDown
+  Upload, CalendarClock, Tag, ChevronDown, Maximize2, Minimize2
 } from 'lucide-react';
 import './App.css';
 import { supabase } from './supabase';
@@ -252,13 +252,66 @@ function Navbar({ eyeOpen, toggleEye, onGotoAgenda, loginOpen, toggleLogin, user
   );
 }
 
+// ---------- Back Head (titulo + Ampliar + Cerrar con separacion) ----------
+function BackHead({ title, icon: Icon, expanded, onToggleExpand, onClose }) {
+  return (
+    <div className="back-head">
+      <h3>{Icon && <Icon size={18} />} {title}</h3>
+      <div className="back-actions">
+        <button className="icon-btn expand-btn" onClick={onToggleExpand}
+          title={expanded ? 'Reducir' : 'Ampliar a pantalla completa'}>
+          {expanded ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+        </button>
+        <button className="icon-btn close-btn" onClick={onClose} title="Cerrar">
+          <X size={18} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ---------- Flip Card ----------
+// Mide la cara activa (front o back) con ResizeObserver y aplica esa altura al
+// .flip-inner. Esto permite que el flip 3D funcione igual en desktop y mobile
+// (cards crecen al contenido real) sin atrapar el scroll dentro de un alto fijo.
 function FlipCard({ flipped, front, back, className = '' }) {
+  const innerRef = useRef(null);
+  const frontRef = useRef(null);
+  const backRef = useRef(null);
+
+  useLayoutEffect(() => {
+    if (!innerRef.current) return;
+    const update = () => {
+      const inner = innerRef.current;
+      const active = flipped ? backRef.current : frontRef.current;
+      if (!inner || !active) return;
+      // scrollHeight de la face = altura real del contenido (incluso si el
+      // padre tiene overflow). Sirve igual cuando la face es position:absolute.
+      const natural = active.scrollHeight;
+      if (natural <= 0) return;
+      const isMobile = window.innerWidth < 820;
+      const maxH = isMobile ? Infinity : Math.round(window.innerHeight * 0.78);
+      inner.style.height = `${Math.min(natural, maxH)}px`;
+    };
+    update();
+    const t1 = setTimeout(update, 60);
+    const t2 = setTimeout(update, 250); // segunda medicion por contenidos async
+    const ro = new ResizeObserver(update);
+    if (frontRef.current) ro.observe(frontRef.current);
+    if (backRef.current) ro.observe(backRef.current);
+    window.addEventListener('resize', update);
+    return () => {
+      clearTimeout(t1); clearTimeout(t2);
+      ro.disconnect();
+      window.removeEventListener('resize', update);
+    };
+  }, [flipped]);
+
   return (
     <div className={`flip-card ${className} ${flipped ? 'is-flipped' : ''}`}>
-      <div className="flip-inner">
-        <div className="flip-face flip-front">{front}</div>
-        <div className="flip-face flip-back">{back}</div>
+      <div ref={innerRef} className="flip-inner">
+        <div ref={frontRef} className="flip-face flip-front">{front}</div>
+        <div ref={backRef} className="flip-face flip-back">{back}</div>
       </div>
     </div>
   );
@@ -274,11 +327,7 @@ function RegistroForm({ data, setData, onCancel, onSubmit, tiposCx, setTiposCx, 
 
   return (
     <form className="reg-form" onSubmit={(e) => { e.preventDefault(); onSubmit(); }}>
-      <div className="reg-form-head">
-        <h3>{editingId ? 'Editar cirugia' : 'Nuevo registro'}</h3>
-        <button type="button" className="icon-btn" onClick={onCancel}><X size={18} /></button>
-      </div>
-
+      {editingId && <p className="muted small reg-edit-note">Editando registro existente</p>}
       <div className="reg-grid">
         <div>
           <label>Fecha</label>
@@ -548,7 +597,7 @@ function CalculatorModal({ onClose }) {
 }
 
 // ---------- Agenda (Weekly / Monthly) ----------
-function AgendaPanel({ records, notes, jornadas, onSelectDay, onAddDay, onMinimize }) {
+function AgendaPanel({ records, notes, jornadas, onSelectDay, onAddDay, expanded, onToggleExpand, onClose }) {
   const [mode, setMode] = useState('mes'); // semana | mes
   const [cursor, setCursor] = useState(new Date());
 
@@ -603,7 +652,13 @@ function AgendaPanel({ records, notes, jornadas, onSelectDay, onAddDay, onMinimi
           <button className="icon-btn" onClick={() => step(-1)}><ChevronLeft size={16} /></button>
           <button className="btn-ghost sm" onClick={() => setCursor(new Date())}>Hoy</button>
           <button className="icon-btn" onClick={() => step(1)}><ChevronRight size={16} /></button>
-          <button className="btn-ghost sm" onClick={onMinimize}><X size={14} /> Cerrar</button>
+          <div className="back-actions agenda-back-actions">
+            <button className="icon-btn expand-btn" onClick={onToggleExpand}
+              title={expanded ? 'Reducir' : 'Ampliar a pantalla completa'}>
+              {expanded ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+            </button>
+            <button className="icon-btn close-btn" onClick={onClose} title="Cerrar"><X size={16} /></button>
+          </div>
         </div>
       </div>
 
@@ -1140,10 +1195,12 @@ export default function App() {
   // UI state
   const [eyeOpen, setEyeOpen] = useState(false);
   const [loginOpen, setLoginOpen] = useState(false);
-  const [registroFlipped, setRegistroFlipped] = useState(false);
-  const [agendaExpanded, setAgendaExpanded] = useState(false);
-  const [reportesFlipped, setReportesFlipped] = useState(false);
-  const [historialFlipped, setHistorialFlipped] = useState(false);
+  // Flip por slot: tl=registro, tr=agenda, bl=reportes, br=historial
+  const [flippedSlots, setFlippedSlots] = useState({ tl: false, tr: false, bl: false, br: false });
+  // Que card esta expandido a full body (1 a la vez)
+  const [expandedSlot, setExpandedSlot] = useState(null);
+  const toggleFlip = (slot, v) => setFlippedSlots((p) => ({ ...p, [slot]: typeof v === 'boolean' ? v : !p[slot] }));
+  const closeBack = (slot) => { setFlippedSlots((p) => ({ ...p, [slot]: false })); if (expandedSlot === slot) setExpandedSlot(null); };
   const [showCalculator, setShowCalculator] = useState(false);
   const [showAbout, setShowAbout] = useState(false);
   const [showImportExcel, setShowImportExcel] = useState(false);
@@ -1214,7 +1271,8 @@ export default function App() {
 
   // handlers
   const gotoAgenda = () => {
-    setAgendaExpanded(true);
+    toggleFlip('tr', true);
+    setExpandedSlot('tr');
     setTimeout(() => agendaRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
   };
 
@@ -1255,7 +1313,7 @@ export default function App() {
   const openNewRegistro = (dateStr) => {
     setEditingId(null);
     setFormData({ ...emptyForm(), fecha: dateStr || dateToStr(new Date()) });
-    setRegistroFlipped(true);
+    toggleFlip('tl', true);
     document.getElementById('card-registro')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   };
 
@@ -1269,7 +1327,7 @@ export default function App() {
       }
       return next;
     });
-    setRegistroFlipped(false);
+    closeBack('tl');
     setEditingId(null);
     setFormData(emptyForm());
   };
@@ -1277,7 +1335,7 @@ export default function App() {
   const editRecord = (r) => {
     setEditingId(r.id);
     setFormData({ ...emptyForm(), ...r });
-    setRegistroFlipped(true);
+    toggleFlip('tl', true);
     setSelectedDay(null);
     document.getElementById('card-registro')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   };
@@ -1338,11 +1396,11 @@ export default function App() {
           <p>Registra cirugias, visualiza la agenda semanal o mensual y calcula tus honorarios con retencion automatica del {(TAX_RATE * 100).toFixed(2)}%.</p>
         </section>
 
-        <section className={`grid-4 ${agendaExpanded ? 'agenda-mode' : ''}`} ref={agendaRef}>
+        <section className={`grid-4 ${expandedSlot ? `expanded-${expandedSlot}` : ''}`} ref={agendaRef}>
           {/* CARD 1 - Registro */}
           <div id="card-registro" className="grid-slot slot-tl">
             <FlipCard
-              flipped={registroFlipped}
+              flipped={flippedSlots.tl}
               front={
                 <div className="card front-card">
                   <div className="card-icon"><Stethoscope size={28} /></div>
@@ -1360,10 +1418,14 @@ export default function App() {
               }
               back={
                 <div className="card back-card">
+                  <BackHead title="Nuevo registro" icon={Stethoscope}
+                    expanded={expandedSlot === 'tl'}
+                    onToggleExpand={() => setExpandedSlot(expandedSlot === 'tl' ? null : 'tl')}
+                    onClose={() => { closeBack('tl'); setEditingId(null); }} />
                   <RegistroForm
                     data={formData}
                     setData={setFormData}
-                    onCancel={() => { setRegistroFlipped(false); setEditingId(null); }}
+                    onCancel={() => { closeBack('tl'); setEditingId(null); }}
                     onSubmit={submitRegistro}
                     tiposCx={tiposCx} setTiposCx={setTiposCx}
                     medicos={medicos} setMedicos={setMedicos}
@@ -1378,13 +1440,13 @@ export default function App() {
           {/* CARD 2 - Agenda */}
           <div className="grid-slot slot-tr">
             <FlipCard
-              flipped={agendaExpanded}
+              flipped={flippedSlots.tr}
               front={
                 <div className="card front-card">
                   <div className="card-icon"><CalendarIcon size={28} /></div>
                   <h3>Revisar agenda</h3>
                   <p>Visualiza por semana o mes. Bloques de 24 horas, jornadas y notas.</p>
-                  <button className="btn-primary big" onClick={() => setAgendaExpanded(true)}>
+                  <button className="btn-primary big" onClick={() => { toggleFlip('tr', true); setExpandedSlot('tr'); }}>
                     <CalendarIcon size={18} /> Abrir agenda
                   </button>
                 </div>
@@ -1397,7 +1459,9 @@ export default function App() {
                     jornadas={jornadas}
                     onSelectDay={setSelectedDay}
                     onAddDay={openNewRegistro}
-                    onMinimize={() => setAgendaExpanded(false)}
+                    expanded={expandedSlot === 'tr'}
+                    onToggleExpand={() => setExpandedSlot(expandedSlot === 'tr' ? null : 'tr')}
+                    onClose={() => closeBack('tr')}
                   />
                 </div>
               }
@@ -1407,14 +1471,14 @@ export default function App() {
           {/* CARD 3 - Reportes */}
           <div className="grid-slot slot-bl">
             <FlipCard
-              flipped={reportesFlipped}
+              flipped={flippedSlots.bl}
               front={
                 <div className="card front-card">
                   <div className="card-icon"><TrendingUp size={28} /></div>
                   <h3>Reportes y descargas</h3>
                   <p>Ingresos por semana, mes, 2 meses o personalizado. Retencion {(TAX_RATE * 100).toFixed(2)}%.</p>
                   <div className="card-actions-row">
-                    <button className="btn-primary big" onClick={() => setReportesFlipped(true)}>
+                    <button className="btn-primary big" onClick={() => toggleFlip('bl', true)}>
                       <Download size={18} /> Ver reportes
                     </button>
                     <button className="btn-ghost" onClick={() => setShowCalculator(true)}><CalcIcon size={16} /> Calculadora</button>
@@ -1423,10 +1487,10 @@ export default function App() {
               }
               back={
                 <div className="card back-card">
-                  <div className="back-head">
-                    <h3><TrendingUp size={18} /> Reportes</h3>
-                    <button className="icon-btn" onClick={() => setReportesFlipped(false)}><X size={18} /></button>
-                  </div>
+                  <BackHead title="Reportes" icon={TrendingUp}
+                    expanded={expandedSlot === 'bl'}
+                    onToggleExpand={() => setExpandedSlot(expandedSlot === 'bl' ? null : 'bl')}
+                    onClose={() => closeBack('bl')} />
                   <ReportesPanel records={records} />
                 </div>
               }
@@ -1436,23 +1500,23 @@ export default function App() {
           {/* CARD 4 - Historial */}
           <div className="grid-slot slot-br">
             <FlipCard
-              flipped={historialFlipped}
+              flipped={flippedSlots.br}
               front={
                 <div className="card front-card">
                   <div className="card-icon"><Receipt size={28} /></div>
                   <h3>Historial</h3>
                   <p>Busca registros por paciente, cirujano, institucion o fecha. Papelera con restauracion.</p>
-                  <button className="btn-primary big" onClick={() => setHistorialFlipped(true)}>
+                  <button className="btn-primary big" onClick={() => toggleFlip('br', true)}>
                     <Filter size={18} /> Abrir historial
                   </button>
                 </div>
               }
               back={
                 <div className="card back-card">
-                  <div className="back-head">
-                    <h3><Receipt size={18} /> Historial</h3>
-                    <button className="icon-btn" onClick={() => setHistorialFlipped(false)}><X size={18} /></button>
-                  </div>
+                  <BackHead title="Historial" icon={Receipt}
+                    expanded={expandedSlot === 'br'}
+                    onToggleExpand={() => setExpandedSlot(expandedSlot === 'br' ? null : 'br')}
+                    onClose={() => closeBack('br')} />
                   <HistorialPanel
                     records={records}
                     onEdit={editRecord}
@@ -1501,7 +1565,7 @@ export default function App() {
       {showImportExcel && (
         <ImportarExcelModal
           onClose={() => setShowImportExcel(false)}
-          onImport={(recs) => { bulkImport(recs); setAgendaExpanded(true); }}
+          onImport={(recs) => { bulkImport(recs); toggleFlip('tr', true); setExpandedSlot('tr'); }}
         />
       )}
 

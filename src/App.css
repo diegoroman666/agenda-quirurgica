@@ -357,16 +357,34 @@ label { display: block; font-size: 0.74rem; font-weight: 700; text-transform: up
   transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.grid-slot { min-height: 360px; }
+.grid-slot { min-height: 360px; min-width: 0; }
 
-.grid-4.agenda-mode .slot-tr {
+/* Expanded: el slot activo ocupa la fila superior completa, los otros 3
+   se acomodan debajo. Reglas explicitas por slot. */
+.grid-4.expanded-tl .slot-tl,
+.grid-4.expanded-tr .slot-tr,
+.grid-4.expanded-bl .slot-bl,
+.grid-4.expanded-br .slot-br {
   grid-column: 1 / -1;
   grid-row: 1;
   min-height: 660px;
 }
-.grid-4.agenda-mode .slot-tl { grid-row: 2; grid-column: 1; }
-.grid-4.agenda-mode .slot-bl { grid-row: 3; grid-column: 1; }
-.grid-4.agenda-mode .slot-br { grid-row: 3; grid-column: 2; }
+/* expanded-tl: tl arriba, tr/bl/br abajo */
+.grid-4.expanded-tl .slot-tr { grid-row: 2; grid-column: 1; }
+.grid-4.expanded-tl .slot-bl { grid-row: 2; grid-column: 2; }
+.grid-4.expanded-tl .slot-br { grid-row: 3; grid-column: 1 / -1; }
+/* expanded-tr: tr arriba, tl/bl/br abajo */
+.grid-4.expanded-tr .slot-tl { grid-row: 2; grid-column: 1; }
+.grid-4.expanded-tr .slot-bl { grid-row: 3; grid-column: 1; }
+.grid-4.expanded-tr .slot-br { grid-row: 3; grid-column: 2; }
+/* expanded-bl: bl arriba, tl/tr/br abajo */
+.grid-4.expanded-bl .slot-tl { grid-row: 2; grid-column: 1; }
+.grid-4.expanded-bl .slot-tr { grid-row: 2; grid-column: 2; }
+.grid-4.expanded-bl .slot-br { grid-row: 3; grid-column: 1 / -1; }
+/* expanded-br: br arriba, tl/tr/bl abajo */
+.grid-4.expanded-br .slot-tl { grid-row: 2; grid-column: 1; }
+.grid-4.expanded-br .slot-tr { grid-row: 2; grid-column: 2; }
+.grid-4.expanded-br .slot-bl { grid-row: 3; grid-column: 1 / -1; }
 
 @media (max-width: 820px) {
   .grid-4 {
@@ -381,18 +399,22 @@ label { display: block; font-size: 0.74rem; font-weight: 700; text-transform: up
   .grid-4.agenda-mode .slot-br { grid-column: 1 !important; grid-row: auto !important; min-height: auto !important; }
 }
 
-/* ---------- FLIP CARD ---------- */
+/* ---------- FLIP CARD ----------
+   La altura del .flip-inner la fija JavaScript (FlipCard) midiendo la cara
+   activa con ResizeObserver. La transition: height anima el cambio cuando
+   front/back tienen alturas distintas. */
 .flip-card {
   position: relative;
   width: 100%;
-  height: 100%;
-  min-height: 360px;
+  min-width: 0;
+  /* La altura del .flip-inner la fija FlipCard (JS) midiendo scrollHeight
+     de la cara activa. NO ponemos height/min-height en .flip-card. */
 }
 .flip-inner {
   position: relative;
   width: 100%;
-  height: 100%;
-  transition: transform 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+  min-height: 320px;
+  transition: transform 0.8s cubic-bezier(0.4, 0, 0.2, 1), height 0.5s cubic-bezier(0.4, 0, 0.2, 1);
   transform-style: preserve-3d;
   transform-origin: center center;
   /* perspective() en el propio transform → cada card gira SIEMPRE sobre su eje central */
@@ -402,7 +424,8 @@ label { display: block; font-size: 0.74rem; font-weight: 700; text-transform: up
 .flip-card.is-flipped .flip-inner { transform: perspective(1600px) rotateY(180deg); }
 
 .flip-face {
-  position: absolute; inset: 0;
+  position: absolute;
+  inset: 0;
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
   border-radius: 22px;
@@ -440,13 +463,32 @@ label { display: block; font-size: 0.74rem; font-weight: 700; text-transform: up
 
 .card-actions-row { display: flex; gap: 8px; flex-wrap: wrap; }
 
-.back-card { padding: 20px; overflow: auto; }
+.back-card { padding: 20px; overflow-y: auto; max-height: 80vh; min-width: 0; }
 .back-head {
   display: flex; justify-content: space-between; align-items: center;
   margin-bottom: 14px; padding-bottom: 12px;
   border-bottom: 1px solid var(--border-color);
+  gap: 12px;
 }
-.back-head h3 { margin: 0; display: inline-flex; align-items: center; gap: 8px; font-size: 1.05rem; }
+.back-head h3 { margin: 0; display: inline-flex; align-items: center; gap: 8px; font-size: 1.05rem; flex: 1; min-width: 0; }
+
+/* Ampliar y Cerrar con separacion visual clara para no tocar el equivocado */
+.back-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 14px; /* separacion entre Ampliar y Cerrar */
+}
+.back-actions .expand-btn {
+  background: var(--bg-input);
+  border: 1px solid var(--border-input);
+  border-radius: 8px;
+}
+.back-actions .expand-btn:hover { border-color: var(--primary-color); color: var(--primary-color); }
+.back-actions .close-btn { color: var(--text-muted); }
+.back-actions .close-btn:hover { background: rgba(220, 53, 69, 0.15); color: #dc3545; }
+.agenda-back-actions { margin-left: 8px; padding-left: 12px; border-left: 1px solid var(--border-color); }
+
+.reg-edit-note { margin: 0 0 12px; }
 
 /* ---------- REGISTRO FORM ---------- */
 .reg-form { display: flex; flex-direction: column; height: 100%; }
@@ -775,14 +817,30 @@ label { display: block; font-size: 0.74rem; font-weight: 700; text-transform: up
 .rep-row .money { font-weight: 700; color: var(--primary-color); }
 
 /* ---------- HISTORIAL ---------- */
-.historial { display: flex; flex-direction: column; gap: 12px; }
+.historial { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 .hist-toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .hist-search { position: relative; flex: 1; min-width: 180px; }
 .hist-search svg { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--text-muted); pointer-events: none; }
 .hist-search .input { padding-left: 32px; }
 
-.hist-table-wrap { overflow-x: auto; max-height: 360px; }
-.hist-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+.hist-table-wrap {
+  overflow-x: auto;
+  overflow-y: auto;
+  max-height: 360px;
+  min-width: 0;
+  width: 100%;
+  -webkit-overflow-scrolling: touch;
+  /* visual hint de que hay scroll horizontal en mobile */
+  background:
+    linear-gradient(to right, var(--bg-card) 30%, rgba(255,255,255,0)),
+    linear-gradient(to right, rgba(255,255,255,0), var(--bg-card) 70%) 100% 0,
+    linear-gradient(to right, rgba(0,0,0,0.08), rgba(0,0,0,0)),
+    linear-gradient(to left, rgba(0,0,0,0.08), rgba(0,0,0,0)) 100% 0;
+  background-repeat: no-repeat;
+  background-size: 40px 100%, 40px 100%, 14px 100%, 14px 100%;
+  background-attachment: local, local, scroll, scroll;
+}
+.hist-table { min-width: 720px; border-collapse: collapse; font-size: 0.82rem; }
 .hist-table th, .hist-table td { padding: 8px 10px; text-align: left; border-bottom: 1px solid var(--border-color); white-space: nowrap; }
 .hist-table th { font-size: 0.7rem; text-transform: uppercase; color: var(--text-muted); position: sticky; top: 0; background: var(--bg-card); }
 .hist-table tr.deleted { opacity: 0.45; }
@@ -936,58 +994,61 @@ label { display: block; font-size: 0.74rem; font-weight: 700; text-transform: up
 }
 
 /* ============================================================================
-   MOBILE FLIP-CARD OVERRIDES (debe ir al final para ganar la cascada)
-   Reemplaza el flip 3D por toggle de display: los cards crecen a su
-   contenido y el body scrollea verticalmente sin overflow horizontal.
+   MOBILE OVERRIDES (must come LAST to win the cascade)
+   El flip 3D 100% funciona en mobile porque FlipCard mide la cara activa
+   con ResizeObserver y ajusta innerRef.style.height al scrollHeight real.
+   No usamos display:none toggles — la card rota 3D y crece al contenido.
    ============================================================================ */
 @media (max-width: 820px) {
-  .grid-slot { min-height: auto !important; height: auto !important; }
-
-  .flip-card { height: auto !important; min-height: auto !important; }
-
+  /* Constrain widths para que un card ancho (ej. tabla historial) no rompa
+     el layout horizontal de la grilla mobile (1 columna). min-width: 0 es
+     clave para flex/grid children. */
+  .grid-slot {
+    min-height: auto !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+  }
+  .flip-card {
+    min-height: auto !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+  }
   .flip-inner {
-    position: static !important;
-    transform: none !important;     /* cancela el perspective() rotateY() del desktop */
-    transition: none !important;
-    transform-style: flat !important;
-    height: auto !important;
-    will-change: auto !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
   }
-
   .flip-face {
-    position: static !important;
-    inset: auto !important;
-    transform: none !important;
-    backface-visibility: visible !important;
-    -webkit-backface-visibility: visible !important;
-    overflow: visible !important;
-    border-radius: 22px;
-    height: auto !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
   }
-
-  /* Toggle de visibilidad (reemplaza la animación 3D) */
-  .flip-card:not(.is-flipped) .flip-back { display: none !important; }
-  .flip-card.is-flipped .flip-front { display: none !important; }
-
-  .card { min-height: auto !important; height: auto !important; }
-
-  /* back-card: NO visible — contiene el scroll horizontal dentro de la card */
+  .card {
+    min-height: auto !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+  }
   .back-card {
-    overflow-x: hidden !important;
-    overflow-y: auto !important;
     max-height: none !important;
+    overflow: visible !important;
+  }
+  /* En mobile el body scrollea — la card crece libremente. Header pegado
+     arriba dentro del back-card para que Ampliar/Cerrar queden accesibles. */
+  .back-head {
+    position: sticky;
+    top: 0;
+    background: var(--bg-card);
+    z-index: 5;
+    padding-top: 8px;
+    margin-top: -8px;
   }
 
-  .grid-4.agenda-mode .slot-tr { min-height: auto !important; }
-
-  /* week-scroll se contiene dentro del back-card */
-  .week-scroll {
-    border-radius: 10px;
-    max-width: 100%;
-  }
-
-  /* agenda-panel: padding reducido en móvil */
+  /* agenda-panel: padding reducido en mobile */
   .agenda-panel { padding: 12px; }
+
+  /* Scrolls anidados capeados a viewport */
+  .week-grid { max-height: 70vh; -webkit-overflow-scrolling: touch; }
+  .hist-table-wrap { max-height: 60vh; -webkit-overflow-scrolling: touch; }
+  .rep-list { max-height: 50vh; -webkit-overflow-scrolling: touch; }
+  .modal-card { max-height: 92vh; -webkit-overflow-scrolling: touch; }
 }
 
 @media print {
