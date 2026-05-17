@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Eye, EyeOff, Calendar as CalendarIcon, LogIn, LogOut, User,
   Palette, Sun, Moon, ZoomIn, Info, HelpCircle, X, Plus, Trash2,
-  RotateCcw, Calculator as CalcIcon, FileSpreadsheet, FileText,
+  RotateCcw, Calculator as CalcIcon, Download, FileSpreadsheet, FileText,
   ChevronLeft, ChevronRight, Search, Filter, Edit3, Save, StickyNote,
   Clock, Stethoscope, Receipt, TrendingUp, Loader2,
   Upload, CalendarClock, Tag, ChevronDown
