@@ -208,7 +208,7 @@ function LoginDropdown({ open, onClose, user, onLogout, onEmail, onSignup, loadi
             </div>
 
             {action === 'signup' ? (
-              <p className="muted small">Usa tu correo real o invent&aacute; un usuario (ej. <code>juan123</code>) si prefer&iacute;s no compartir Gmail. Tus registros se sincronizan en la nube y los ves desde cualquier dispositivo.</p>
+              <p className="muted small">Eleg&iacute; cualquier nombre de usuario (ej. <code>juan123</code>) y una contrase&ntilde;a. Tus registros se sincronizan en la nube y los pod&eacute;s ver desde cualquier dispositivo.</p>
             ) : (
               <p className="muted small">Inicia sesion para sincronizar tus registros en la nube.</p>
             )}
@@ -219,7 +219,7 @@ function LoginDropdown({ open, onClose, user, onLogout, onEmail, onSignup, loadi
                 type="text"
                 required
                 autoComplete={action === 'signup' ? 'username' : 'email'}
-                placeholder={action === 'signup' ? 'correo@dominio.com o usuario' : 'correo o usuario'}
+                placeholder={action === 'signup' ? 'Nombre de usuario' : 'Usuario o correo'}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
               />
@@ -1681,7 +1681,7 @@ export default function App() {
             <li><b>Reportes y descargas</b> (abajo izq.): elige rango (semana, mes, 2 meses, 3 meses, anio, personalizado) y <b>Descarga Excel</b> (.xlsx) o <b>Descarga PDF</b>.</li>
             <li><b>Historial</b> (abajo der.): filtra por columna. Acciones por fila: ver, mover fecha, editar, eliminar/restaurar.</li>
             <li>El icono <b>ojo</b> abre el menu: tema de color (4 swatches), claro/oscuro, zoom, acerca de y esta ayuda.</li>
-            <li>El boton <b>Iniciar sesion</b> permite vincular tu Gmail por Google OAuth (mas seguro). Tambien funciona sin login (datos en este dispositivo).</li>
+            <li>El boton <b>Iniciar sesion</b> permite crear una cuenta o entrar con tu usuario y contrasena para sincronizar tus registros en la nube y verlos desde cualquier dispositivo. Tambien funciona sin login (datos en este dispositivo).</li>
           </ol>
         </InfoModal>
       )}
