@@ -153,19 +153,39 @@ function EyeMenu({ open, onClose, colors, setColors, theme, setTheme, zoom, setZ
 }
 
 // ---------- Login dropdown ----------
-function LoginDropdown({ open, onClose, user, onLogout, onEmail, loading, error, info }) {
+function LoginDropdown({ open, onClose, user, onLogout, onEmail, onSignup, loading, error, info }) {
+  const [action, setAction] = useState('signin'); // signin | signup
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [localErr, setLocalErr] = useState('');
 
-  useEffect(() => { if (!open) { setEmail(''); setPassword(''); } }, [open]);
+  useEffect(() => {
+    if (!open) {
+      setAction('signin'); setEmail(''); setPassword(''); setConfirm(''); setLocalErr('');
+    }
+  }, [open]);
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    setLocalErr('');
+    if (action === 'signup') {
+      if (email.trim().length < 3) { setLocalErr('El usuario debe tener al menos 3 caracteres.'); return; }
+      if (password.length < 6) { setLocalErr('La contrasena debe tener al menos 6 caracteres.'); return; }
+      if (password !== confirm) { setLocalErr('Las contrasenas no coinciden.'); return; }
+      onSignup(email.trim(), password);
+    } else {
+      onEmail('signin', email.trim(), password);
+    }
+  };
 
   if (!open) return null;
   return (
     <>
       <div className="login-backdrop" onClick={onClose} />
-      <div className="login-pop" role="dialog" aria-label="Iniciar sesion">
+      <div className="login-pop" role="dialog" aria-label="Cuenta">
         <div className="login-pop-head">
-          <h4>{user ? 'Tu cuenta' : 'Iniciar sesion'}</h4>
+          <h4>{user ? 'Tu cuenta' : (action === 'signup' ? 'Crear cuenta' : 'Iniciar sesion')}</h4>
           <button className="icon-btn" onClick={onClose}><X size={16} /></button>
         </div>
 
@@ -182,17 +202,59 @@ function LoginDropdown({ open, onClose, user, onLogout, onEmail, loading, error,
           </>
         ) : (
           <>
-            <p className="muted small">Inicia sesion para sincronizar tus registros en la nube y verlos desde cualquier dispositivo.</p>
-            <form onSubmit={(e) => { e.preventDefault(); onEmail('signin', email, password); }} className="login-form">
-              <input className="input" type="email" required autoComplete="email" placeholder="correo@dominio.com" value={email} onChange={(e) => setEmail(e.target.value)} />
-              <input className="input" type="password" required minLength={6} autoComplete="current-password" placeholder="Contrasena" value={password} onChange={(e) => setPassword(e.target.value)} />
+            <div className="login-tabs">
+              <button type="button" className={action === 'signin' ? 'on' : ''} onClick={() => { setAction('signin'); setLocalErr(''); }}>Entrar</button>
+              <button type="button" className={action === 'signup' ? 'on' : ''} onClick={() => { setAction('signup'); setLocalErr(''); }}>Crear cuenta</button>
+            </div>
+
+            {action === 'signup' ? (
+              <p className="muted small">Usa tu correo real o invent&aacute; un usuario (ej. <code>juan123</code>) si prefer&iacute;s no compartir Gmail. Tus registros se sincronizan en la nube y los ves desde cualquier dispositivo.</p>
+            ) : (
+              <p className="muted small">Inicia sesion para sincronizar tus registros en la nube.</p>
+            )}
+
+            <form onSubmit={handleSubmit} className="login-form">
+              <input
+                className="input"
+                type="text"
+                required
+                autoComplete={action === 'signup' ? 'username' : 'email'}
+                placeholder={action === 'signup' ? 'correo@dominio.com o usuario' : 'correo o usuario'}
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+              <input
+                className="input"
+                type="password"
+                required
+                minLength={6}
+                autoComplete={action === 'signin' ? 'current-password' : 'new-password'}
+                placeholder="Contrasena (min 6 caracteres)"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+              {action === 'signup' && (
+                <input
+                  className="input"
+                  type="password"
+                  required
+                  minLength={6}
+                  autoComplete="new-password"
+                  placeholder="Repetir contrasena"
+                  value={confirm}
+                  onChange={(e) => setConfirm(e.target.value)}
+                />
+              )}
               <button className="btn-primary full" disabled={loading}>
-                {loading ? <Loader2 size={16} className="spin" /> : <><LogIn size={16} /> Entrar</>}
+                {loading
+                  ? <Loader2 size={16} className="spin" />
+                  : (action === 'signup' ? <><User size={16} /> Crear cuenta</> : <><LogIn size={16} /> Entrar</>)}
               </button>
             </form>
-            {error && <div className="alert-err">{error}</div>}
+
+            {(localErr || error) && <div className="alert-err">{localErr || error}</div>}
             {info && <div className="alert-ok">{info}</div>}
-            <p className="muted xs">Sesion segura con JWT en cookie httpOnly.</p>
+            <p className="muted xs">Sesion segura con JWT en cookie httpOnly + bcrypt.</p>
             <p className="muted xs"><b>Tip:</b> la app tambien funciona sin login — los datos quedan en este dispositivo.</p>
           </>
         )}
@@ -1324,6 +1386,17 @@ export default function App() {
     finally { setAuthLoading(false); }
   };
 
+  const handleSignup = async (email, password) => {
+    setAuthLoading(true); setAuthError(''); setAuthInfo('');
+    try {
+      const me = await api.apiSignup(email, password);
+      setUser(me);
+      setLoginOpen(false);
+      setAuthInfo('Cuenta creada y sesion iniciada.');
+    } catch (e) { setAuthError(e.message || 'No se pudo crear la cuenta'); }
+    finally { setAuthLoading(false); }
+  };
+
   const handleLogout = async () => {
     try { await api.apiLogout(); } catch {}
     setUser(null); setLoginOpen(false);
@@ -1403,6 +1476,7 @@ export default function App() {
         user={user}
         onLogout={handleLogout}
         onEmail={handleEmail}
+        onSignup={handleSignup}
         loading={authLoading}
         error={authError}
         info={authInfo}

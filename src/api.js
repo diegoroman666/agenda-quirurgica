@@ -22,11 +22,26 @@ const handle = async (res) => {
 export const apiMe = async () => {
   const res = await fetch('/api/me', { credentials: 'same-origin' });
   if (res.status === 401 || res.status === 404) return null;
-  return handle(res);
+  if (!res.ok) return null;
+  const ct = res.headers.get('content-type') || '';
+  // Defensa contra dev servers (Vite) que sirven index.html en rutas /api/*
+  // cuando no hay backend. Solo aceptamos JSON con shape de usuario valido.
+  if (!ct.includes('application/json')) return null;
+  const body = await res.json().catch(() => null);
+  if (!body || typeof body !== 'object' || !body.id || !body.email) return null;
+  return body;
 };
 
 export const apiLogin = (email, password) =>
   fetch('/api/login', {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password }),
+  }).then(handle);
+
+export const apiSignup = (email, password) =>
+  fetch('/api/signup', {
     method: 'POST',
     credentials: 'same-origin',
     headers: { 'Content-Type': 'application/json' },
