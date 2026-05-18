@@ -8,7 +8,7 @@ import {
   Upload, CalendarClock, Tag, ChevronDown, Maximize2, Minimize2
 } from 'lucide-react';
 import './App.css';
-import { supabase } from './supabase';
+import * as api from './api';
 
 const TAX_RATE = 0.1525; // Retencion honorarios Chile 2026 (escalonado: 14.5% 2025, 15.25% 2026, 16% 2027)
 
@@ -153,13 +153,11 @@ function EyeMenu({ open, onClose, colors, setColors, theme, setTheme, zoom, setZ
 }
 
 // ---------- Login dropdown ----------
-function LoginDropdown({ open, onClose, user, onLogout, onGoogle, onEmail, loading, error, info }) {
-  const [mode, setMode] = useState('main'); // main | email
-  const [action, setAction] = useState('signin'); // signin | signup
+function LoginDropdown({ open, onClose, user, onLogout, onEmail, loading, error, info }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
-  useEffect(() => { if (!open) { setMode('main'); setAction('signin'); setEmail(''); setPassword(''); } }, [open]);
+  useEffect(() => { if (!open) { setEmail(''); setPassword(''); } }, [open]);
 
   if (!open) return null;
   return (
@@ -177,45 +175,25 @@ function LoginDropdown({ open, onClose, user, onLogout, onGoogle, onEmail, loadi
               <div className="login-avatar"><User size={18} /></div>
               <div className="login-meta">
                 <div className="login-name">{user.email}</div>
-                <small className="muted">Sesion activa · Supabase Auth</small>
+                <small className="muted">Sesion activa · {user.role === 'superadmin' ? 'Superadmin' : 'Usuario'}</small>
               </div>
             </div>
             <button className="btn-danger full" onClick={onLogout}><LogOut size={16} /> Cerrar sesion</button>
           </>
-        ) : mode === 'main' ? (
-          <>
-            <p className="muted small">Vincula tu Gmail con Google OAuth — la forma mas segura (sin contrasena local, sin riesgo de fuerza bruta).</p>
-            <button className="btn-google full" onClick={onGoogle} disabled={loading}>
-              {loading ? <Loader2 size={16} className="spin" /> : (
-                <>
-                  <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3c-1.6 4.6-6 8-11.3 8-6.6 0-12-5.4-12-12s5.4-12 12-12c3 0 5.8 1.1 7.9 3l5.7-5.7C34 5.1 29.3 3 24 3 12.4 3 3 12.4 3 24s9.4 21 21 21 21-9.4 21-21c0-1.2-.1-2.3-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 16 19 13 24 13c3 0 5.8 1.1 7.9 3l5.7-5.7C34 5.1 29.3 3 24 3 16.3 3 9.6 7.5 6.3 14.7z"/><path fill="#4CAF50" d="M24 45c5.2 0 9.9-2 13.4-5.2l-6.2-5.2c-2 1.4-4.5 2.4-7.2 2.4-5.3 0-9.7-3.4-11.3-8l-6.5 5C9.5 40.5 16.2 45 24 45z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4-4 5.3l6.2 5.2c-.4.4 6.5-4.7 6.5-14.5 0-1.2-.1-2.3-.4-3.5z"/></svg>
-                  Continuar con Google
-                </>
-              )}
-            </button>
-            <div className="divider"><span>o</span></div>
-            <button className="btn-ghost full" onClick={() => setMode('email')}>Usar correo y contrasena</button>
-            {error && <div className="alert-err">{error}</div>}
-            {info && <div className="alert-ok">{info}</div>}
-            <p className="muted xs">Protegido por Supabase Auth (JWT + cookies httpOnly).</p>
-            <p className="muted xs"><b>Tip:</b> la app tambien funciona sin login — los datos quedan en este dispositivo.</p>
-          </>
         ) : (
           <>
-            <div className="login-tabs">
-              <button className={action === 'signin' ? 'on' : ''} onClick={() => setAction('signin')}>Entrar</button>
-              <button className={action === 'signup' ? 'on' : ''} onClick={() => setAction('signup')}>Crear cuenta</button>
-            </div>
-            <form onSubmit={(e) => { e.preventDefault(); onEmail(action, email, password); }} className="login-form">
+            <p className="muted small">Inicia sesion para sincronizar tus registros en la nube y verlos desde cualquier dispositivo.</p>
+            <form onSubmit={(e) => { e.preventDefault(); onEmail('signin', email, password); }} className="login-form">
               <input className="input" type="email" required autoComplete="email" placeholder="correo@dominio.com" value={email} onChange={(e) => setEmail(e.target.value)} />
-              <input className="input" type="password" required minLength={6} autoComplete={action === 'signin' ? 'current-password' : 'new-password'} placeholder="Contrasena (min 6 caracteres)" value={password} onChange={(e) => setPassword(e.target.value)} />
+              <input className="input" type="password" required minLength={6} autoComplete="current-password" placeholder="Contrasena" value={password} onChange={(e) => setPassword(e.target.value)} />
               <button className="btn-primary full" disabled={loading}>
-                {loading ? <Loader2 size={16} className="spin" /> : <><LogIn size={16} /> {action === 'signin' ? 'Entrar' : 'Crear cuenta'}</>}
+                {loading ? <Loader2 size={16} className="spin" /> : <><LogIn size={16} /> Entrar</>}
               </button>
             </form>
             {error && <div className="alert-err">{error}</div>}
             {info && <div className="alert-ok">{info}</div>}
-            <button className="btn-ghost full" onClick={() => setMode('main')}><ChevronLeft size={14} /> Volver</button>
+            <p className="muted xs">Sesion segura con JWT en cookie httpOnly.</p>
+            <p className="muted xs"><b>Tip:</b> la app tambien funciona sin login — los datos quedan en este dispositivo.</p>
           </>
         )}
       </div>
@@ -1265,23 +1243,16 @@ export default function App() {
     return () => document.body.classList.remove('modal-open');
   }, [anyModalOpen]);
 
-  // ---------- SUPABASE SYNC ----------
-  // - Al iniciar sesion: baja los registros del usuario y sube los locales que
-  //   no existan remotamente (preserva los datos en localStorage del primer
-  //   dispositivo).
-  // - En cada cambio posterior a records: upsert delta a Supabase.
-  // - Cuando no hay sesion: solo localStorage (modo offline).
+  // ---------- CLOUD SYNC (Netlify DB) ----------
+  // - Al iniciar sesion: baja los registros del usuario via /api/records, sube
+  //   los locales que no existan remotamente (migracion del primer dispositivo)
+  //   y mergea. La sesion vive en cookie httpOnly seteada por /api/login.
+  // - En cada cambio posterior a records: upsert delta via POST /api/records.
+  // - Sin sesion: solo localStorage (modo offline).
   const syncBootRef = useRef(false);
   const lastSyncedSigRef = useRef('');
-  const recordToRow = (r, uid) => ({
-    id: r.id,
-    user_id: uid,
-    fecha: r.fecha || null,
-    data: r,
-    deleted: !!r.deleted,
-  });
   useEffect(() => {
-    if (!user || !supabase?.from) {
+    if (!user) {
       syncBootRef.current = false;
       lastSyncedSigRef.current = '';
       return;
@@ -1289,28 +1260,21 @@ export default function App() {
     let cancelled = false;
     (async () => {
       try {
-        const { data: rows, error } = await supabase
-          .from('surgery_records').select('*').eq('user_id', user.id);
+        const rows = await api.apiGetRecords();
         if (cancelled) return;
-        if (error) {
-          console.warn('[sync] load error:', error.message);
-          syncBootRef.current = true; // permite que pushes futuros funcionen
-          return;
-        }
         const remote = (rows || []).map((row) => ({ ...(row.data || {}), id: row.id, deleted: !!row.deleted }));
         const remoteIds = new Set(remote.map((r) => r.id));
         const localOnly = (records || []).filter((r) => !remoteIds.has(r.id));
         if (localOnly.length > 0) {
-          const inserts = localOnly.map((r) => recordToRow(r, user.id));
-          const { error: upErr } = await supabase.from('surgery_records').upsert(inserts);
-          if (upErr) console.warn('[sync] migration upload error:', upErr.message);
+          try { await api.apiUpsertRecords(localOnly); }
+          catch (e) { console.warn('[sync] migration upload:', e.message); }
         }
         const merged = [...remote, ...localOnly];
         updateData((p) => ({ ...p, records: merged }));
         lastSyncedSigRef.current = JSON.stringify(merged.map((r) => [r.id, r]));
         syncBootRef.current = true;
       } catch (e) {
-        console.warn('[sync] boot error:', e?.message || e);
+        console.warn('[sync] boot:', e?.message || e);
         syncBootRef.current = true;
       }
     })();
@@ -1318,7 +1282,7 @@ export default function App() {
   }, [user?.id]);
 
   useEffect(() => {
-    if (!user || !supabase?.from || !syncBootRef.current) return;
+    if (!user || !syncBootRef.current) return;
     const sig = JSON.stringify((records || []).map((r) => [r.id, r]));
     if (sig === lastSyncedSigRef.current) return;
     const prev = (() => { try { return new Map(JSON.parse(lastSyncedSigRef.current || '[]')); } catch { return new Map(); } })();
@@ -1328,23 +1292,19 @@ export default function App() {
     });
     if (changed.length === 0) { lastSyncedSigRef.current = sig; return; }
     (async () => {
-      const { error } = await supabase.from('surgery_records').upsert(changed.map((r) => recordToRow(r, user.id)));
-      if (error) console.warn('[sync] push error:', error.message);
-      else lastSyncedSigRef.current = sig;
+      try { await api.apiUpsertRecords(changed); lastSyncedSigRef.current = sig; }
+      catch (e) { console.warn('[sync] push:', e.message); }
     })();
   }, [records, user?.id]);
 
-  // auth listener
+  // auth bootstrap: pregunta /api/me al cargar para saber si hay sesion activa
+  // (cookie httpOnly persiste entre reloads y dispositivos del mismo browser).
   useEffect(() => {
     let mounted = true;
-    if (!supabase?.auth) return;
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (mounted) setUser(session?.user || null);
-    }).catch(() => {});
-    const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => {
-      setUser(session?.user || null);
-    });
-    return () => { mounted = false; sub?.subscription?.unsubscribe(); };
+    api.apiMe()
+      .then((me) => { if (mounted) setUser(me); })
+      .catch(() => { if (mounted) setUser(null); });
+    return () => { mounted = false; };
   }, []);
 
   // handlers
@@ -1354,37 +1314,18 @@ export default function App() {
     setTimeout(() => agendaRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
   };
 
-  const handleGoogle = async () => {
-    setAuthLoading(true); setAuthError('');
-    try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: { redirectTo: window.location.origin },
-      });
-      if (error) throw error;
-    } catch (e) { setAuthError(e.message || 'Error al vincular con Google'); }
-    finally { setAuthLoading(false); }
-  };
-
-  const handleEmail = async (action, email, password) => {
+  const handleEmail = async (_action, email, password) => {
     setAuthLoading(true); setAuthError(''); setAuthInfo('');
     try {
-      if (action === 'signup') {
-        const { data, error } = await supabase.auth.signUp({ email, password });
-        if (error) throw error;
-        if (data.session) { setLoginOpen(false); }
-        else { setAuthInfo('Cuenta creada. Revisa tu correo para confirmar.'); }
-      } else {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw error;
-        setLoginOpen(false);
-      }
-    } catch (e) { setAuthError(e.message || 'Error de autenticacion'); }
+      const me = await api.apiLogin(email, password);
+      setUser(me);
+      setLoginOpen(false);
+    } catch (e) { setAuthError(e.message || 'Credenciales invalidas'); }
     finally { setAuthLoading(false); }
   };
 
   const handleLogout = async () => {
-    try { await supabase.auth.signOut(); } catch {}
+    try { await api.apiLogout(); } catch {}
     setUser(null); setLoginOpen(false);
   };
 
@@ -1461,7 +1402,6 @@ export default function App() {
         onClose={() => setLoginOpen(false)}
         user={user}
         onLogout={handleLogout}
-        onGoogle={handleGoogle}
         onEmail={handleEmail}
         loading={authLoading}
         error={authError}
