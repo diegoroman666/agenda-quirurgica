@@ -1051,6 +1051,86 @@ label { display: block; font-size: 0.74rem; font-weight: 700; text-transform: up
   .modal-card { max-height: 92vh; -webkit-overflow-scrolling: touch; }
 }
 
+/* ============================================================================
+   FIX 1: SCROLL INTERNO DEL HISTORIAL
+   El back-card del slot-br (Historial) no scrollea — la tabla scrollea dentro
+   de .hist-table-wrap. Para que la tabla tenga un area visible amplia damos
+   un max-height generoso al wrap, y el back-card queda con overflow hidden
+   para que el wheel/touch no se le escape al contenedor exterior.
+   No tocamos el .back-card global ni los otros slots.
+   ============================================================================ */
+.slot-br .back-card {
+  height: auto !important;
+  max-height: none !important;
+  overflow: visible !important;
+}
+.slot-br .hist-table-wrap {
+  max-height: 55vh !important;
+  overflow-y: auto !important;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+.grid-4.expanded-br .slot-br .hist-table-wrap {
+  max-height: 68vh !important;
+}
+
+/* ============================================================================
+   FIX 1b: BODY LOCK + MODAL OVERSCROLL
+   Cuando hay modal abierto se bloquea el scroll del body para que el deslizar
+   dentro del modal no "se mezcle con el fondo". El modal-card contiene su
+   propio overscroll (no propaga al body) y permite touch vertical.
+   ============================================================================ */
+body.modal-open {
+  overflow: hidden !important;
+  touch-action: none;
+}
+.modal-card {
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+  -webkit-overflow-scrolling: touch;
+}
+.modal-backdrop {
+  overscroll-behavior: contain;
+  touch-action: none;
+}
+
+/* ============================================================================
+   FIX 1c: TOUCH HORIZONTAL/VERTICAL EN SCROLLS DENTRO DE LOS GRIDS
+   En mobile el dedo a veces no logra disparar el scroll horizontal de la
+   tabla semanal o del historial. Forzamos touch-action explicito en cada
+   contenedor scrolleable para que el browser sepa que ambas direcciones
+   son validas y entregue el gesto al contenedor correcto.
+   ============================================================================ */
+.week-scroll,
+.hist-table-wrap,
+.rep-list,
+.month-grid {
+  touch-action: pan-x pan-y;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
+/* ============================================================================
+   FIX 2: ROTACION SOBRE PROPIO EJE EN TODOS LOS GRIDS
+   Reafirma per-slot que cada card tiene su propio contexto 3D y rota desde su
+   centro exacto — identico al comportamiento del grid 1. Estas reglas son
+   adiciones (no sobreescriben las existentes de .flip-inner) y se aplican por
+   .grid-slot para que el efecto sea consistente en los 4 cards, incluso cuando
+   alguno se expande a 1/-1 columnas.
+   ============================================================================ */
+.grid-slot {
+  perspective: 1600px;
+  perspective-origin: 50% 50%;
+  transform-style: preserve-3d;
+}
+.grid-slot .flip-card {
+  transform-style: preserve-3d;
+  transform-origin: 50% 50%;
+}
+.grid-slot .flip-inner {
+  transform-origin: 50% 50% 0;
+}
+
 @media print {
   .navbar, .eye-menu, .eye-backdrop, .login-pop, .login-backdrop, .app-footer,
   .rep-actions, .rep-presets, .rep-range, .reg-actions, .icon-btn, .add-mini { display: none !important; }

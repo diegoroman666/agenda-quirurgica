@@ -1256,6 +1256,15 @@ export default function App() {
     inject('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
   }, []);
 
+  // Lock body scroll when any modal is open — evita que el scroll del modal
+  // se contagie al body (mezcla con el fondo / scroll del contraste).
+  const anyModalOpen = !!(selectedDay || movingRecord || viewRecord || showCalculator || showImportExcel || showAbout || showHelp);
+  useEffect(() => {
+    if (anyModalOpen) document.body.classList.add('modal-open');
+    else document.body.classList.remove('modal-open');
+    return () => document.body.classList.remove('modal-open');
+  }, [anyModalOpen]);
+
   // auth listener
   useEffect(() => {
     let mounted = true;
@@ -1446,7 +1455,7 @@ export default function App() {
                   <div className="card-icon"><CalendarIcon size={28} /></div>
                   <h3>Revisar agenda</h3>
                   <p>Visualiza por semana o mes. Bloques de 24 horas, jornadas y notas.</p>
-                  <button className="btn-primary big" onClick={() => { toggleFlip('tr', true); setExpandedSlot('tr'); }}>
+                  <button className="btn-primary big" onClick={() => toggleFlip('tr', true)}>
                     <CalendarIcon size={18} /> Abrir agenda
                   </button>
                 </div>
