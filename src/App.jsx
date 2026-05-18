@@ -1265,6 +1265,75 @@ export default function App() {
     return () => document.body.classList.remove('modal-open');
   }, [anyModalOpen]);
 
+  // ---------- SUPABASE SYNC ----------
+  // - Al iniciar sesion: baja los registros del usuario y sube los locales que
+  //   no existan remotamente (preserva los datos en localStorage del primer
+  //   dispositivo).
+  // - En cada cambio posterior a records: upsert delta a Supabase.
+  // - Cuando no hay sesion: solo localStorage (modo offline).
+  const syncBootRef = useRef(false);
+  const lastSyncedSigRef = useRef('');
+  const recordToRow = (r, uid) => ({
+    id: r.id,
+    user_id: uid,
+    fecha: r.fecha || null,
+    data: r,
+    deleted: !!r.deleted,
+  });
+  useEffect(() => {
+    if (!user || !supabase?.from) {
+      syncBootRef.current = false;
+      lastSyncedSigRef.current = '';
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data: rows, error } = await supabase
+          .from('surgery_records').select('*').eq('user_id', user.id);
+        if (cancelled) return;
+        if (error) {
+          console.warn('[sync] load error:', error.message);
+          syncBootRef.current = true; // permite que pushes futuros funcionen
+          return;
+        }
+        const remote = (rows || []).map((row) => ({ ...(row.data || {}), id: row.id, deleted: !!row.deleted }));
+        const remoteIds = new Set(remote.map((r) => r.id));
+        const localOnly = (records || []).filter((r) => !remoteIds.has(r.id));
+        if (localOnly.length > 0) {
+          const inserts = localOnly.map((r) => recordToRow(r, user.id));
+          const { error: upErr } = await supabase.from('surgery_records').upsert(inserts);
+          if (upErr) console.warn('[sync] migration upload error:', upErr.message);
+        }
+        const merged = [...remote, ...localOnly];
+        updateData((p) => ({ ...p, records: merged }));
+        lastSyncedSigRef.current = JSON.stringify(merged.map((r) => [r.id, r]));
+        syncBootRef.current = true;
+      } catch (e) {
+        console.warn('[sync] boot error:', e?.message || e);
+        syncBootRef.current = true;
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (!user || !supabase?.from || !syncBootRef.current) return;
+    const sig = JSON.stringify((records || []).map((r) => [r.id, r]));
+    if (sig === lastSyncedSigRef.current) return;
+    const prev = (() => { try { return new Map(JSON.parse(lastSyncedSigRef.current || '[]')); } catch { return new Map(); } })();
+    const changed = (records || []).filter((r) => {
+      const p = prev.get(r.id);
+      return !p || JSON.stringify(p) !== JSON.stringify(r);
+    });
+    if (changed.length === 0) { lastSyncedSigRef.current = sig; return; }
+    (async () => {
+      const { error } = await supabase.from('surgery_records').upsert(changed.map((r) => recordToRow(r, user.id)));
+      if (error) console.warn('[sync] push error:', error.message);
+      else lastSyncedSigRef.current = sig;
+    })();
+  }, [records, user?.id]);
+
   // auth listener
   useEffect(() => {
     let mounted = true;
