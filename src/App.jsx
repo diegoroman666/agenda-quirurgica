@@ -802,7 +802,10 @@ function ReportesPanel({ records, hideEarnings, setHideEarnings }) {
   const range = useMemo(() => {
     const now = new Date();
     let start, end;
-    if (preset === 'semana') {
+    if (preset === 'dia') {
+      start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
+    } else if (preset === 'semana') {
       start = new Date(now); start.setDate(now.getDate() - now.getDay());
       end = new Date(start); end.setDate(start.getDate() + 6);
     } else if (preset === 'mes') {
@@ -904,7 +907,7 @@ function ReportesPanel({ records, hideEarnings, setHideEarnings }) {
   return (
     <div className="reportes">
       <div className="rep-presets">
-        {[['semana', 'Semana'], ['mes', 'Mes'], ['bimestre', '2 meses'], ['trimestre', '3 meses'], ['anio', 'Anio'], ['custom', 'Personalizado']].map(([k, l]) => (
+        {[['dia', 'Día'], ['semana', 'Semana'], ['mes', 'Mes'], ['bimestre', '2 meses'], ['trimestre', '3 meses'], ['anio', 'Año'], ['custom', 'Personalizado']].map(([k, l]) => (
           <button key={k} className={preset === k ? 'on' : ''} onClick={() => setPreset(k)}>{l}</button>
         ))}
       </div>
@@ -941,8 +944,14 @@ function ReportesPanel({ records, hideEarnings, setHideEarnings }) {
       </div>
 
       <div className="rep-list">
-        {filtered.length === 0 ? <p className="muted center">Sin registros en este periodo.</p> : (
-          filtered.slice(0, 10).map((r) => (
+        {preset === 'anio' ? (
+          <p className="muted center">
+            Año completo seleccionado ({stats.count} registros). Usá los botones <b>Descargar Excel</b> o <b>Descargar PDF</b> para ver el detalle.
+          </p>
+        ) : filtered.length === 0 ? (
+          <p className="muted center">Sin registros en este periodo.</p>
+        ) : (
+          filtered.map((r) => (
             <div key={r.id} className="rep-row">
               <small>{r.fecha} {r.hora}</small>
               <b>{r.paciente}</b>
@@ -951,7 +960,6 @@ function ReportesPanel({ records, hideEarnings, setHideEarnings }) {
             </div>
           ))
         )}
-        {filtered.length > 10 && <small className="muted center">... y {filtered.length - 10} mas (descarga CSV para verlos todos).</small>}
       </div>
     </div>
   );
