@@ -820,6 +820,22 @@ label { display: block; font-size: 0.74rem; font-weight: 700; text-transform: up
 }
 .rep-row .money { font-weight: 700; color: var(--primary-color); }
 
+/* ---------- INSTITUTION BADGE ---------- */
+.inst-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 8px 1px 6px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  background: color-mix(in srgb, var(--inst-c, var(--text-muted)) 18%, transparent);
+  color: var(--inst-c, var(--text-muted));
+  border: 1px solid color-mix(in srgb, var(--inst-c, var(--text-muted)) 30%, transparent);
+  white-space: nowrap;
+}
+.inst-badge svg { flex-shrink: 0; }
+
 /* ---------- HISTORIAL ---------- */
 .historial { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 .hist-toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }

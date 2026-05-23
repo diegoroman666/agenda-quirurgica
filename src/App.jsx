@@ -5,7 +5,8 @@ import {
   RotateCcw, Calculator as CalcIcon, Download, FileSpreadsheet, FileText,
   ChevronLeft, ChevronRight, Search, Filter, Edit3, Save, StickyNote,
   Clock, Stethoscope, Receipt, TrendingUp, Loader2,
-  Upload, CalendarClock, Tag, ChevronDown, ChevronUp, Maximize2, Minimize2
+  Upload, CalendarClock, Tag, ChevronDown, ChevronUp, Maximize2, Minimize2,
+  Hospital, Heart, Building2
 } from 'lucide-react';
 import './App.css';
 import * as api from './api';
@@ -22,6 +23,14 @@ const DEFAULT_COLORS = {
 const DEFAULT_TIPOS_CX = ['Laparoscopia', 'Artroscopia', 'Cirugia Abierta', 'Endoscopia', 'Microcirugia', 'Vanguard 360'];
 const DEFAULT_MEDICOS = ['Dr./Dra.'];
 const DEFAULT_INSTITUCIONES = ['Hospital San Fernando', 'Hospital Santacruz', 'Isamedica', 'Red Salud', 'Fusat'];
+const INST_META = {
+  'Hospital San Fernando': { icon: Hospital, color: '#dc3545' },
+  'Hospital Santacruz': { icon: Hospital, color: '#0d6efd' },
+  'Isamedica': { icon: Building2, color: '#28a745' },
+  'Red Salud': { icon: Heart, color: '#fd7e14' },
+  'Fusat': { icon: Building2, color: '#6f42c1' },
+  'Clever Salud': { icon: Stethoscope, color: '#20c997' },
+};
 
 const NOTE_COLORS = ['#fde68a', '#bbf7d0', '#bfdbfe', '#fecaca', '#e9d5ff', '#fed7aa'];
 const JORNADA_COLORS = {
@@ -92,6 +101,16 @@ const loadPrefs = () => {
   catch { return {}; }
 };
 const savePrefs = (p) => localStorage.setItem(STORAGE.prefs, JSON.stringify(p));
+
+const InstBadge = ({ name }) => {
+  const meta = INST_META[name];
+  const Icon = meta?.icon || Building2;
+  return (
+    <span className="inst-badge" style={meta ? { '--inst-c': meta.color } : undefined}>
+      {meta && <Icon size={12} />} {name}
+    </span>
+  );
+};
 
 // ---------- Eye Menu ----------
 function EyeMenu({ open, onClose, colors, setColors, theme, setTheme, zoom, setZoom, onShowAbout, onShowHelp }) {
@@ -549,7 +568,7 @@ function DayModal({ dateStr, records, notes, jornada, onClose, onDelete, onResto
                   <div className="rec-time"><Clock size={12} /> {r.hora}</div>
                   <div className="rec-main">
                     <b>{r.paciente}</b>
-                    <small>{r.tipoCx} · {r.medico} · {r.institucion}</small>
+                    <small>{r.tipoCx} · {r.medico} · <InstBadge name={r.institucion} /></small>
                   </div>
                   <div className="rec-money">{fmtMaybe(r.valorBruto, hideEarnings)}</div>
                   <div className="rec-actions">
@@ -681,7 +700,8 @@ function AgendaPanel({ records, notes, jornadas, onSelectDay, onAddDay, expanded
 
   const weekDays = useMemo(() => {
     const start = new Date(cursor);
-    start.setDate(start.getDate() - start.getDay());
+    const d = start.getDay();
+    start.setDate(start.getDate() + (d === 0 ? -6 : 1 - d));
     return Array.from({ length: 7 }, (_, i) => {
       const d = new Date(start); d.setDate(start.getDate() + i); return dateToStr(d);
     });
@@ -732,7 +752,7 @@ function AgendaPanel({ records, notes, jornadas, onSelectDay, onAddDay, expanded
 
       {mode === 'mes' ? (
         <div className="month-grid">
-          {['Dom', 'Lun', 'Mar', 'Mie', 'Jue', 'Vie', 'Sab'].map((d) => <div key={d} className="dow">{d}</div>)}
+          {['Lun', 'Mar', 'Mie', 'Jue', 'Vie', 'Sab', 'Dom'].map((d) => <div key={d} className="dow">{d}</div>)}
           {monthDays.map((ds, i) => {
             if (!ds) return <div key={i} className="day empty" />;
             const recs = recordsByDay[ds] || [];
@@ -767,7 +787,7 @@ function AgendaPanel({ records, notes, jornadas, onSelectDay, onAddDay, expanded
           <div className="week-grid">
             <div className="hours-col">
               <div className="dow-spacer" />
-              {Array.from({ length: 24 }, (_, h) => <div key={h} className="hour-cell">{pad2(h)}:00</div>)}
+              {Array.from({ length: 17 }, (_, i) => { const h = i + 7; return <div key={h} className="hour-cell">{pad2(h)}:00</div>; })}
             </div>
             {weekDays.map((ds) => {
               const d = parseDate(ds);
@@ -781,17 +801,20 @@ function AgendaPanel({ records, notes, jornadas, onSelectDay, onAddDay, expanded
                     <button className="add-mini" onClick={(e) => { e.stopPropagation(); onAddDay(ds); }}><Plus size={12} /></button>
                   </div>
                   <div className="hours-wrap" style={{ background: jornada && jornada !== 'ninguna' ? JORNADA_COLORS[jornada] : undefined }}>
-                    {Array.from({ length: 24 }, (_, h) => (
-                      <div key={h} className="hour-slot" onClick={() => onSelectDay(ds)}>
-                        {recs.filter((r) => parseInt(r.hora?.split(':')[0], 10) === h).map((r) => (
-                          <div key={r.id} className="ev-slot"
-                               style={r.colorEtiqueta ? { background: r.colorEtiqueta } : undefined}
-                               title={`${r.paciente} · ${r.tipoCx}`}>
-                            <b>{r.hora}</b> {r.paciente}
-                          </div>
-                        ))}
-                      </div>
-                    ))}
+                    {Array.from({ length: 17 }, (_, i) => {
+                      const h = i + 7;
+                      return (
+                        <div key={h} className="hour-slot" onClick={() => onSelectDay(ds)}>
+                          {recs.filter((r) => parseInt(r.hora?.split(':')[0], 10) === h).map((r) => (
+                            <div key={r.id} className="ev-slot"
+                                 style={r.colorEtiqueta ? { background: r.colorEtiqueta } : undefined}
+                                 title={`${r.paciente} · ${r.tipoCx}`}>
+                              <b>{r.hora}</b> {r.paciente}
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               );
@@ -1051,7 +1074,7 @@ function HistorialPanel({ records, onEdit, onDelete, onRestore, onView, onMove, 
                       <td><b>{r.paciente}</b></td>
                       <td>{r.tipoCx}</td>
                       <td>{r.medico}</td>
-                      <td>{r.institucion}</td>
+                      <td><InstBadge name={r.institucion} /></td>
                       <td>{fmtMaybe(f.bruto, hideEarnings)}</td>
                       <td className="pos">{fmtMaybe(f.liquido, hideEarnings)}</td>
                       <td className="actions">
@@ -1103,7 +1126,7 @@ function HistorialPanel({ records, onEdit, onDelete, onRestore, onView, onMove, 
                   <div className="hist-card-body">
                     <span><b>Cirugía:</b> {r.tipoCx}</span>
                     <span><b>Cirujano:</b> {r.medico}</span>
-                    <span><b>Institución:</b> {r.institucion}</span>
+                    <span><b>Institución:</b> <InstBadge name={r.institucion} /></span>
                   </div>
                   <div className="hist-card-money">
                     <span>Bruto: <b>{fmtMaybe(f.bruto, hideEarnings)}</b></span>
@@ -1825,7 +1848,7 @@ export default function App() {
             <dt>Paciente</dt><dd>{viewRecord.paciente} {viewRecord.edad && `(${viewRecord.edad} a, ${viewRecord.sexo})`}</dd>
             <dt>Cirugia</dt><dd>{viewRecord.tipoCx}</dd>
             <dt>Cirujano</dt><dd>{viewRecord.medico}</dd>
-            <dt>Institucion</dt><dd>{viewRecord.institucion}</dd>
+            <dt>Institucion</dt><dd><InstBadge name={viewRecord.institucion} /></dd>
             <dt>Bruto</dt><dd>{fmtMoney(viewRecord.valorBruto)}</dd>
             <dt>Retencion</dt><dd>-{fmtMoney(calcFinance(viewRecord.valorBruto).retencion)}</dd>
             <dt>Liquido</dt><dd className="pos"><b>{fmtMoney(calcFinance(viewRecord.valorBruto).liquido)}</b></dd>
