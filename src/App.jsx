@@ -332,11 +332,10 @@ function FlipCard({ flipped, front, back, className = '' }) {
       const natural = active.scrollHeight;
       if (natural <= 0) return;
       const isMobile = window.innerWidth < 820;
-      // La agenda necesita más alto para que el mes completo quepa sin
-      // scroll interno; el resto de los cards se mantiene en 78vh.
+      // La agenda crece a su altura natural sin cap (sin scroll interno):
+      // si la ventana del notebook es chica, scrollea la página, no la card.
       const hasAgenda = !!active.querySelector('.agenda-panel');
-      const ratio = hasAgenda ? 0.95 : 0.78;
-      const maxH = isMobile ? Infinity : Math.round(window.innerHeight * ratio);
+      const maxH = isMobile || hasAgenda ? Infinity : Math.round(window.innerHeight * 0.78);
       inner.style.height = `${Math.min(natural, maxH)}px`;
     };
     update();
@@ -1004,6 +1003,7 @@ function HistorialPanel({ records, onEdit, onDelete, onRestore, onView, onMove, 
         </button>
       </div>
 
+      {/* Vista de tabla (desktop / tablet) */}
       <div className="hist-table-wrap">
         <table className="hist-table">
           <thead>
@@ -1042,6 +1042,45 @@ function HistorialPanel({ records, onEdit, onDelete, onRestore, onView, onMove, 
           </tbody>
         </table>
       </div>
+
+      {/* Vista de cards (móvil) — sin scroll horizontal */}
+      <div className="hist-cards-mobile">
+        {filtered.length === 0 ? (
+          <p className="muted center">Sin registros.</p>
+        ) : filtered.map((r) => {
+          const f = calcFinance(r.valorBruto);
+          return (
+            <div key={r.id} className={`hist-card ${r.deleted ? 'deleted' : ''}`}>
+              <div className="hist-card-head">
+                <div className="hist-card-name">
+                  <b>{r.paciente}</b>
+                  <small className="muted">{r.fecha} · {r.hora}</small>
+                </div>
+                <div className="hist-card-actions actions">
+                  <button className="icon-btn" title="Ver" onClick={() => onView(r)}><Eye size={14} /></button>
+                  {!r.deleted && <button className="icon-btn" title="Mover fecha" onClick={() => onMove(r)}><CalendarClock size={14} /></button>}
+                  {!r.deleted && <button className="icon-btn" title="Editar" onClick={() => onEdit(r)}><Edit3 size={14} /></button>}
+                  {r.deleted ? (
+                    <button className="icon-btn ok" title="Restaurar" onClick={() => onRestore(r.id)}><RotateCcw size={14} /></button>
+                  ) : (
+                    <button className="icon-btn danger" title="Eliminar" onClick={() => onDelete(r.id)}><Trash2 size={14} /></button>
+                  )}
+                </div>
+              </div>
+              <div className="hist-card-body">
+                <span><b>Cirugía:</b> {r.tipoCx}</span>
+                <span><b>Cirujano:</b> {r.medico}</span>
+                <span><b>Institución:</b> {r.institucion}</span>
+              </div>
+              <div className="hist-card-money">
+                <span>Bruto: <b>{fmtMaybe(f.bruto, hideEarnings)}</b></span>
+                <span className="pos">Líquido: <b>{fmtMaybe(f.liquido, hideEarnings)}</b></span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
       <small className="muted">{filtered.length} registro(s)</small>
     </div>
   );
