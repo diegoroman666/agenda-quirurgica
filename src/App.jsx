@@ -1009,6 +1009,9 @@ function HistorialPanel({ records, onEdit, onDelete, onRestore, onView, onMove, 
           <input type="checkbox" checked={showDeleted} onChange={(e) => setShowDeleted(e.target.checked)} />
           Papelera
         </label>
+        <button className="btn-ghost sm scroll-top-btn" onClick={() => scrollToTop(document.querySelector('.slot-br .hist-table-wrap'))} title="Volver al inicio de la lista">
+          <ChevronUp size={14} /> Inicio
+        </button>
         <button
           type="button"
           className="earnings-toggle"
