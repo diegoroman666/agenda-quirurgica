@@ -62,13 +62,13 @@ const pad2 = (n) => String(n).padStart(2, '0');
 const dateToStr = (d) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
 const scrollToTop = (el) => {
   if (!el) return;
-  if (el.scrollHeight > el.clientHeight) { el.scrollTo({ top: 0, behavior: 'smooth' }); return; }
-  let p = el.parentElement;
-  while (p) {
-    if (p.scrollHeight > p.clientHeight && getComputedStyle(p).overflowY !== 'visible') { p.scrollTo({ top: 0, behavior: 'smooth' }); return; }
-    p = p.parentElement;
+  // Desktop: el contenedor tiene overflow scroll → scroll interno
+  if (el.scrollHeight > el.clientHeight && getComputedStyle(el).overflowY !== 'visible') {
+    el.scrollTo({ top: 0, behavior: 'smooth' });
+    return;
   }
-  window.scrollTo({ top: 0, behavior: 'smooth' });
+  // Mobile: el contenido vive en la pagina → scrollIntoView
+  el.scrollIntoView({ behavior: 'smooth', block: 'start' });
 };
 const parseDate = (s) => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
 const calcFinance = (bruto) => {
@@ -1011,7 +1011,7 @@ function HistorialPanel({ records, onEdit, onDelete, onRestore, onView, onMove, 
           <input type="checkbox" checked={showDeleted} onChange={(e) => setShowDeleted(e.target.checked)} />
           Papelera
         </label>
-        <button className="btn-ghost sm scroll-top-btn" onClick={() => scrollToTop(document.querySelector('.slot-br .hist-table-wrap'))} title="Volver al inicio de la lista">
+        <button className="btn-ghost sm scroll-top-btn" onClick={() => scrollToTop(document.querySelector('.slot-br .hist-table-wrap') || document.querySelector('.hist-cards-mobile'))} title="Volver al inicio de la lista">
           <ChevronUp size={14} /> Inicio
         </button>
         <button
