@@ -60,6 +60,16 @@ const MASK = '•••••';
 const fmtMaybe = (n, hidden) => hidden ? MASK : fmtMoney(n);
 const pad2 = (n) => String(n).padStart(2, '0');
 const dateToStr = (d) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+const scrollToTop = (el) => {
+  if (!el) return;
+  if (el.scrollHeight > el.clientHeight) { el.scrollTo({ top: 0, behavior: 'smooth' }); return; }
+  let p = el.parentElement;
+  while (p) {
+    if (p.scrollHeight > p.clientHeight && getComputedStyle(p).overflowY !== 'visible') { p.scrollTo({ top: 0, behavior: 'smooth' }); return; }
+    p = p.parentElement;
+  }
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+};
 const parseDate = (s) => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
 const calcFinance = (bruto) => {
   const v = parseFloat(bruto) || 0;
@@ -954,7 +964,7 @@ function ReportesPanel({ records, hideEarnings, setHideEarnings }) {
                 <span className="money">{fmtMaybe(r.valorBruto, hideEarnings)}</span>
               </div>
             ))}
-            <button className="btn-ghost sm scroll-top-btn" onClick={() => document.getElementById('rep-list-top')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>
+            <button className="btn-ghost sm scroll-top-btn" onClick={() => scrollToTop(document.querySelector('.rep-list'))}>
               <ChevronUp size={14} /> Volver al inicio
             </button>
           </>
@@ -1048,7 +1058,7 @@ function HistorialPanel({ records, onEdit, onDelete, onRestore, onView, onMove, 
                     </tr>
                   );
                 })}
-                <tr><td colSpan="9" className="scroll-top-cell"><button className="btn-ghost sm scroll-top-btn" onClick={() => document.getElementById('hist-table-top')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}><ChevronUp size={14} /> Volver al inicio</button></td></tr>
+                <tr><td colSpan="9" className="scroll-top-cell"><button className="btn-ghost sm scroll-top-btn" onClick={() => scrollToTop(document.querySelector('.slot-br .hist-table-wrap'))}><ChevronUp size={14} /> Volver al inicio</button></td></tr>
               </>
             )}
           </tbody>
@@ -1093,7 +1103,7 @@ function HistorialPanel({ records, onEdit, onDelete, onRestore, onView, onMove, 
                 </div>
               );
             })}
-            <button className="btn-ghost sm scroll-top-btn" onClick={() => document.getElementById('hist-cards-top')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>
+            <button className="btn-ghost sm scroll-top-btn" onClick={() => scrollToTop(document.querySelector('.slot-br .back-card'))}>
               <ChevronUp size={14} /> Volver al inicio
             </button>
           </>
