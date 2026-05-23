@@ -40,6 +40,10 @@ const LABEL_COLORS = [
   { v: '#20c997', n: 'Turquesa' },
   { v: '#e83e8c', n: 'Rosa' },
   { v: '#6c757d', n: 'Gris' },
+  { v: '#eab308', n: 'Amarillo' },
+  { v: '#b91c1c', n: 'Rojo oscuro' },
+  { v: '#0ea5e9', n: 'Celeste' },
+  { v: '#f472b6', n: 'Rosado' },
 ];
 const THEMES = [
   { name: 'Clinico', primary: '#0d6efd', accent: '#17a2b8' },
