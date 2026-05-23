@@ -5,7 +5,7 @@ import {
   RotateCcw, Calculator as CalcIcon, Download, FileSpreadsheet, FileText,
   ChevronLeft, ChevronRight, Search, Filter, Edit3, Save, StickyNote,
   Clock, Stethoscope, Receipt, TrendingUp, Loader2,
-  Upload, CalendarClock, Tag, ChevronDown, Maximize2, Minimize2
+  Upload, CalendarClock, Tag, ChevronDown, ChevronUp, Maximize2, Minimize2
 } from 'lucide-react';
 import './App.css';
 import * as api from './api';
@@ -161,12 +161,6 @@ function LoginDropdown({ open, onClose, user, onLogout, onEmail, onSignup, loadi
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [localErr, setLocalErr] = useState('');
-
-  useEffect(() => {
-    if (!open) {
-      setAction('signin'); setEmail(''); setPassword(''); setConfirm(''); setLocalErr('');
-    }
-  }, [open]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -1404,6 +1398,8 @@ export default function App() {
   // - Sin sesion: solo localStorage (modo offline).
   const syncBootRef = useRef(false);
   const lastSyncedSigRef = useRef('');
+  const recordsForSync = useRef(records);
+  recordsForSync.current = records;
   useEffect(() => {
     if (!user) {
       syncBootRef.current = false;
@@ -1417,7 +1413,7 @@ export default function App() {
         if (cancelled) return;
         const remote = (rows || []).map((row) => ({ ...(row.data || {}), id: row.id, deleted: !!row.deleted }));
         const remoteIds = new Set(remote.map((r) => r.id));
-        const localOnly = (records || []).filter((r) => !remoteIds.has(r.id));
+        const localOnly = (recordsForSync.current || []).filter((r) => !remoteIds.has(r.id));
         if (localOnly.length > 0) {
           try { await api.apiUpsertRecords(localOnly); }
           catch (e) { console.warn('[sync] migration upload:', e.message); }
@@ -1432,7 +1428,7 @@ export default function App() {
       }
     })();
     return () => { cancelled = true; };
-  }, [user?.id]);
+  }, [user]);
 
   useEffect(() => {
     if (!user || !syncBootRef.current) return;
@@ -1448,7 +1444,7 @@ export default function App() {
       try { await api.apiUpsertRecords(changed); lastSyncedSigRef.current = sig; }
       catch (e) { console.warn('[sync] push:', e.message); }
     })();
-  }, [records, user?.id]);
+  }, [records, user]);
 
   // auth bootstrap: pregunta /api/me al cargar para saber si hay sesion activa
   // (cookie httpOnly persiste entre reloads y dispositivos del mismo browser).
@@ -1489,7 +1485,7 @@ export default function App() {
   };
 
   const handleLogout = async () => {
-    try { await api.apiLogout(); } catch {}
+    try { await api.apiLogout(); } catch (e) { console.warn('Logout:', e?.message); }
     setUser(null); setLoginOpen(false);
   };
 
@@ -1562,6 +1558,7 @@ export default function App() {
       />
 
       <LoginDropdown
+        key={loginOpen ? 'open' : 'closed'}
         open={loginOpen}
         onClose={() => setLoginOpen(false)}
         user={user}
