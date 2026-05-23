@@ -937,7 +937,7 @@ function ReportesPanel({ records, hideEarnings, setHideEarnings }) {
         <button className="btn-primary" onClick={downloadPdf} style={{ background: '#dc3545' }}><FileText size={16} /> Descargar PDF</button>
       </div>
 
-      <div className="rep-list">
+      <div className="rep-list" id="rep-list-top">
         {preset === 'anio' ? (
           <p className="muted center">
             Año completo seleccionado ({stats.count} registros). Usá los botones <b>Descargar Excel</b> o <b>Descargar PDF</b> para ver el detalle.
@@ -945,14 +945,19 @@ function ReportesPanel({ records, hideEarnings, setHideEarnings }) {
         ) : filtered.length === 0 ? (
           <p className="muted center">Sin registros en este periodo.</p>
         ) : (
-          filtered.map((r) => (
-            <div key={r.id} className="rep-row">
-              <small>{r.fecha} {r.hora}</small>
-              <b>{r.paciente}</b>
-              <span>{r.tipoCx}</span>
-              <span className="money">{fmtMaybe(r.valorBruto, hideEarnings)}</span>
-            </div>
-          ))
+          <>
+            {filtered.map((r) => (
+              <div key={r.id} className="rep-row">
+                <small>{r.fecha} {r.hora}</small>
+                <b>{r.paciente}</b>
+                <span>{r.tipoCx}</span>
+                <span className="money">{fmtMaybe(r.valorBruto, hideEarnings)}</span>
+              </div>
+            ))}
+            <button className="btn-ghost sm scroll-top-btn" onClick={() => document.getElementById('rep-list-top')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>
+              <ChevronUp size={14} /> Volver al inicio
+            </button>
+          </>
         )}
       </div>
     </div>
@@ -1013,74 +1018,86 @@ function HistorialPanel({ records, onEdit, onDelete, onRestore, onView, onMove, 
               <th>Fecha</th><th>Hora</th><th>Paciente</th><th>Cirugia</th><th>Cirujano</th><th>Institucion</th><th>Bruto</th><th>Liquido</th><th></th>
             </tr>
           </thead>
-          <tbody>
+          <tbody id="hist-table-top">
             {filtered.length === 0 ? (
               <tr><td colSpan="9" className="muted center">Sin registros.</td></tr>
-            ) : filtered.map((r) => {
-              const f = calcFinance(r.valorBruto);
-              return (
-                <tr key={r.id} className={r.deleted ? 'deleted' : ''}>
-                  <td>{r.fecha}</td>
-                  <td>{r.hora}</td>
-                  <td><b>{r.paciente}</b></td>
-                  <td>{r.tipoCx}</td>
-                  <td>{r.medico}</td>
-                  <td>{r.institucion}</td>
-                  <td>{fmtMaybe(f.bruto, hideEarnings)}</td>
-                  <td className="pos">{fmtMaybe(f.liquido, hideEarnings)}</td>
-                  <td className="actions">
-                    <button className="icon-btn" title="Ver" onClick={() => onView(r)}><Eye size={14} /></button>
-                    {!r.deleted && <button className="icon-btn" title="Mover fecha" onClick={() => onMove(r)}><CalendarClock size={14} /></button>}
-                    {!r.deleted && <button className="icon-btn" title="Editar" onClick={() => onEdit(r)}><Edit3 size={14} /></button>}
-                    {r.deleted ? (
-                      <button className="icon-btn ok" title="Restaurar" onClick={() => onRestore(r.id)}><RotateCcw size={14} /></button>
-                    ) : (
-                      <button className="icon-btn danger" title="Eliminar" onClick={() => onDelete(r.id)}><Trash2 size={14} /></button>
-                    )}
-                  </td>
-                </tr>
-              );
-            })}
+            ) : (
+              <>
+                {filtered.map((r) => {
+                  const f = calcFinance(r.valorBruto);
+                  return (
+                    <tr key={r.id} className={r.deleted ? 'deleted' : ''}>
+                      <td>{r.fecha}</td>
+                      <td>{r.hora}</td>
+                      <td><b>{r.paciente}</b></td>
+                      <td>{r.tipoCx}</td>
+                      <td>{r.medico}</td>
+                      <td>{r.institucion}</td>
+                      <td>{fmtMaybe(f.bruto, hideEarnings)}</td>
+                      <td className="pos">{fmtMaybe(f.liquido, hideEarnings)}</td>
+                      <td className="actions">
+                        <button className="icon-btn" title="Ver" onClick={() => onView(r)}><Eye size={14} /></button>
+                        {!r.deleted && <button className="icon-btn" title="Mover fecha" onClick={() => onMove(r)}><CalendarClock size={14} /></button>}
+                        {!r.deleted && <button className="icon-btn" title="Editar" onClick={() => onEdit(r)}><Edit3 size={14} /></button>}
+                        {r.deleted ? (
+                          <button className="icon-btn ok" title="Restaurar" onClick={() => onRestore(r.id)}><RotateCcw size={14} /></button>
+                        ) : (
+                          <button className="icon-btn danger" title="Eliminar" onClick={() => onDelete(r.id)}><Trash2 size={14} /></button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+                <tr><td colSpan="9" className="scroll-top-cell"><button className="btn-ghost sm scroll-top-btn" onClick={() => document.getElementById('hist-table-top')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}><ChevronUp size={14} /> Volver al inicio</button></td></tr>
+              </>
+            )}
           </tbody>
         </table>
       </div>
 
       {/* Vista de cards (móvil) — sin scroll horizontal */}
-      <div className="hist-cards-mobile">
+      <div className="hist-cards-mobile" id="hist-cards-top">
         {filtered.length === 0 ? (
           <p className="muted center">Sin registros.</p>
-        ) : filtered.map((r) => {
-          const f = calcFinance(r.valorBruto);
-          return (
-            <div key={r.id} className={`hist-card ${r.deleted ? 'deleted' : ''}`}>
-              <div className="hist-card-head">
-                <div className="hist-card-name">
-                  <b>{r.paciente}</b>
-                  <small className="muted">{r.fecha} · {r.hora}</small>
+        ) : (
+          <>
+            {filtered.map((r) => {
+              const f = calcFinance(r.valorBruto);
+              return (
+                <div key={r.id} className={`hist-card ${r.deleted ? 'deleted' : ''}`}>
+                  <div className="hist-card-head">
+                    <div className="hist-card-name">
+                      <b>{r.paciente}</b>
+                      <small className="muted">{r.fecha} · {r.hora}</small>
+                    </div>
+                    <div className="hist-card-actions actions">
+                      <button className="icon-btn" title="Ver" onClick={() => onView(r)}><Eye size={14} /></button>
+                      {!r.deleted && <button className="icon-btn" title="Mover fecha" onClick={() => onMove(r)}><CalendarClock size={14} /></button>}
+                      {!r.deleted && <button className="icon-btn" title="Editar" onClick={() => onEdit(r)}><Edit3 size={14} /></button>}
+                      {r.deleted ? (
+                        <button className="icon-btn ok" title="Restaurar" onClick={() => onRestore(r.id)}><RotateCcw size={14} /></button>
+                      ) : (
+                        <button className="icon-btn danger" title="Eliminar" onClick={() => onDelete(r.id)}><Trash2 size={14} /></button>
+                      )}
+                    </div>
+                  </div>
+                  <div className="hist-card-body">
+                    <span><b>Cirugía:</b> {r.tipoCx}</span>
+                    <span><b>Cirujano:</b> {r.medico}</span>
+                    <span><b>Institución:</b> {r.institucion}</span>
+                  </div>
+                  <div className="hist-card-money">
+                    <span>Bruto: <b>{fmtMaybe(f.bruto, hideEarnings)}</b></span>
+                    <span className="pos">Líquido: <b>{fmtMaybe(f.liquido, hideEarnings)}</b></span>
+                  </div>
                 </div>
-                <div className="hist-card-actions actions">
-                  <button className="icon-btn" title="Ver" onClick={() => onView(r)}><Eye size={14} /></button>
-                  {!r.deleted && <button className="icon-btn" title="Mover fecha" onClick={() => onMove(r)}><CalendarClock size={14} /></button>}
-                  {!r.deleted && <button className="icon-btn" title="Editar" onClick={() => onEdit(r)}><Edit3 size={14} /></button>}
-                  {r.deleted ? (
-                    <button className="icon-btn ok" title="Restaurar" onClick={() => onRestore(r.id)}><RotateCcw size={14} /></button>
-                  ) : (
-                    <button className="icon-btn danger" title="Eliminar" onClick={() => onDelete(r.id)}><Trash2 size={14} /></button>
-                  )}
-                </div>
-              </div>
-              <div className="hist-card-body">
-                <span><b>Cirugía:</b> {r.tipoCx}</span>
-                <span><b>Cirujano:</b> {r.medico}</span>
-                <span><b>Institución:</b> {r.institucion}</span>
-              </div>
-              <div className="hist-card-money">
-                <span>Bruto: <b>{fmtMaybe(f.bruto, hideEarnings)}</b></span>
-                <span className="pos">Líquido: <b>{fmtMaybe(f.liquido, hideEarnings)}</b></span>
-              </div>
-            </div>
-          );
-        })}
+              );
+            })}
+            <button className="btn-ghost sm scroll-top-btn" onClick={() => document.getElementById('hist-cards-top')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>
+              <ChevronUp size={14} /> Volver al inicio
+            </button>
+          </>
+        )}
       </div>
 
       <small className="muted">{filtered.length} registro(s)</small>
