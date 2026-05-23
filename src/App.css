@@ -854,11 +854,10 @@ label { display: block; font-size: 0.74rem; font-weight: 700; text-transform: up
     display: flex;
     flex-direction: column;
     gap: 10px;
-    max-height: 60vh;
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
-    overscroll-behavior: contain;
-    padding-right: 2px;
+    /* sin max-height ni overflow interno: el panel crece con su contenido
+       y la página entera scrollea verticalmente (scroll nativo confiable) */
+    max-height: none;
+    overflow: visible;
   }
   .hist-card {
     background: var(--bg-input);
@@ -1006,7 +1005,8 @@ label { display: block; font-size: 0.74rem; font-weight: 700; text-transform: up
   .agenda-controls { flex-wrap: wrap; gap: 6px; }
   .week-scroll { max-height: 70vh; }
   .hist-table-wrap { max-height: 60vh; -webkit-overflow-scrolling: touch; }
-  .rep-list { max-height: 50vh; -webkit-overflow-scrolling: touch; }
+  /* En móvil rep-list crece libre — la página scrollea (no el contenedor) */
+  .rep-list { max-height: none !important; overflow: visible !important; }
   .modal-card { max-height: 92vh; -webkit-overflow-scrolling: touch; }
 }
 
