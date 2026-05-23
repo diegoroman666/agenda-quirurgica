@@ -327,30 +327,32 @@ function FlipCard({ flipped, front, back, className = '', expanded = false }) {
 
   useLayoutEffect(() => {
     if (!innerRef.current) return;
+    const inner = innerRef.current;
     const update = () => {
-      const inner = innerRef.current;
       const active = flipped ? backRef.current : frontRef.current;
       if (!inner || !active) return;
-      // scrollHeight de la face = altura real del contenido (incluso si el
-      // padre tiene overflow). Sirve igual cuando la face es position:absolute.
       const natural = active.scrollHeight;
       if (natural <= 0) return;
       const isMobile = window.innerWidth < 820;
-      // La agenda crece a su altura natural sin cap (sin scroll interno):
-      // si la ventana del notebook es chica, scrollea la página, no la card.
       const hasAgenda = !!active.querySelector('.agenda-panel');
       const maxH = isMobile || hasAgenda || expanded ? Infinity : Math.round(window.innerHeight * 0.78);
       inner.style.height = `${Math.min(natural, maxH)}px`;
     };
     update();
     const t1 = setTimeout(update, 60);
-    const t2 = setTimeout(update, 250); // segunda medicion por contenidos async
+    const t2 = setTimeout(update, 250);
+    // Cuando se cierra el card, limpia el alto fijo tras la transicion
+    // para que CSS recupere su altura natural (evita altura enorme en mobile).
+    const tClear = !flipped && setTimeout(() => {
+      if (innerRef.current) innerRef.current.style.height = '';
+    }, 550);
     const ro = new ResizeObserver(update);
     if (frontRef.current) ro.observe(frontRef.current);
     if (backRef.current) ro.observe(backRef.current);
     window.addEventListener('resize', update);
     return () => {
       clearTimeout(t1); clearTimeout(t2);
+      if (tClear) clearTimeout(tClear);
       ro.disconnect();
       window.removeEventListener('resize', update);
     };
