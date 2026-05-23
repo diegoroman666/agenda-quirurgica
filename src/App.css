@@ -367,11 +367,9 @@ label { display: block; font-size: 0.74rem; font-weight: 700; text-transform: up
 .grid-4.expanded-br .slot-br {
   grid-column: 1 / -1;
   grid-row: 1;
-  min-height: 660px;
+  min-height: 92vh;
+  height: auto;
 }
-/* Agenda expandida: usar todo el alto disponible del viewport. El min-height
-   asegura que el slot tenga al menos el alto del viewport pero puede crecer. */
-.grid-4.expanded-tr .slot-tr { min-height: 92vh; height: auto; }
 /* expanded-tl: tl arriba, tr/bl/br abajo */
 .grid-4.expanded-tl .slot-tr { grid-row: 2; grid-column: 1; }
 .grid-4.expanded-tl .slot-bl { grid-row: 2; grid-column: 2; }
@@ -1146,6 +1144,14 @@ label { display: block; font-size: 0.74rem; font-weight: 700; text-transform: up
    para que el wheel/touch no se le escape al contenedor exterior.
    No tocamos el .back-card global ni los otros slots.
    ============================================================================ */
+/* Expanded tl/bl/br: back-card sin cap de altura — igual que agenda */
+.grid-4.expanded-tl .slot-tl .back-card,
+.grid-4.expanded-bl .slot-bl .back-card,
+.grid-4.expanded-br .slot-br .back-card {
+  max-height: none !important;
+  overflow: visible !important;
+  height: auto !important;
+}
 .slot-br .back-card {
   height: auto !important;
   max-height: none !important;

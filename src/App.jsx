@@ -310,7 +310,7 @@ function BackHead({ title, icon: Icon, expanded, onToggleExpand, onClose }) {
 // Mide la cara activa (front o back) con ResizeObserver y aplica esa altura al
 // .flip-inner. Esto permite que el flip 3D funcione igual en desktop y mobile
 // (cards crecen al contenido real) sin atrapar el scroll dentro de un alto fijo.
-function FlipCard({ flipped, front, back, className = '' }) {
+function FlipCard({ flipped, front, back, className = '', expanded = false }) {
   const innerRef = useRef(null);
   const frontRef = useRef(null);
   const backRef = useRef(null);
@@ -329,7 +329,7 @@ function FlipCard({ flipped, front, back, className = '' }) {
       // La agenda crece a su altura natural sin cap (sin scroll interno):
       // si la ventana del notebook es chica, scrollea la página, no la card.
       const hasAgenda = !!active.querySelector('.agenda-panel');
-      const maxH = isMobile || hasAgenda ? Infinity : Math.round(window.innerHeight * 0.78);
+      const maxH = isMobile || hasAgenda || expanded ? Infinity : Math.round(window.innerHeight * 0.78);
       inner.style.height = `${Math.min(natural, maxH)}px`;
     };
     update();
@@ -344,7 +344,7 @@ function FlipCard({ flipped, front, back, className = '' }) {
       ro.disconnect();
       window.removeEventListener('resize', update);
     };
-  }, [flipped]);
+  }, [flipped, expanded]);
 
   return (
     <div className={`flip-card ${className} ${flipped ? 'is-flipped' : ''}`}>
@@ -1598,6 +1598,7 @@ export default function App() {
           <div id="card-registro" className="grid-slot slot-tl">
             <FlipCard
               flipped={flippedSlots.tl}
+              expanded={expandedSlot === 'tl'}
               front={
                 <div className="card front-card">
                   <div className="card-icon"><Stethoscope size={28} /></div>
@@ -1638,6 +1639,7 @@ export default function App() {
           <div className="grid-slot slot-tr">
             <FlipCard
               flipped={flippedSlots.tr}
+              expanded={expandedSlot === 'tr'}
               front={
                 <div className="card front-card">
                   <div className="card-icon"><CalendarIcon size={28} /></div>
@@ -1669,6 +1671,7 @@ export default function App() {
           <div className="grid-slot slot-bl">
             <FlipCard
               flipped={flippedSlots.bl}
+              expanded={expandedSlot === 'bl'}
               front={
                 <div className="card front-card">
                   <div className="card-icon"><TrendingUp size={28} /></div>
@@ -1698,6 +1701,7 @@ export default function App() {
           <div className="grid-slot slot-br">
             <FlipCard
               flipped={flippedSlots.br}
+              expanded={expandedSlot === 'br'}
               front={
                 <div className="card front-card">
                   <div className="card-icon"><Receipt size={28} /></div>
