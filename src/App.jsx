@@ -56,6 +56,8 @@ const STORAGE = {
 // ---------- utils ----------
 const uid = () => `cx-${Date.now()}-${Math.floor(Math.random() * 9999)}`;
 const fmtMoney = (n) => `$${Number(n || 0).toLocaleString('es-CL', { maximumFractionDigits: 0 })}`;
+const MASK = '•••••';
+const fmtMaybe = (n, hidden) => hidden ? MASK : fmtMoney(n);
 const pad2 = (n) => String(n).padStart(2, '0');
 const dateToStr = (d) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
 const parseDate = (s) => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
@@ -330,7 +332,11 @@ function FlipCard({ flipped, front, back, className = '' }) {
       const natural = active.scrollHeight;
       if (natural <= 0) return;
       const isMobile = window.innerWidth < 820;
-      const maxH = isMobile ? Infinity : Math.round(window.innerHeight * 0.78);
+      // La agenda necesita más alto para que el mes completo quepa sin
+      // scroll interno; el resto de los cards se mantiene en 78vh.
+      const hasAgenda = !!active.querySelector('.agenda-panel');
+      const ratio = hasAgenda ? 0.95 : 0.78;
+      const maxH = isMobile ? Infinity : Math.round(window.innerHeight * ratio);
       inner.style.height = `${Math.min(natural, maxH)}px`;
     };
     update();
@@ -468,7 +474,7 @@ function RegistroForm({ data, setData, onCancel, onSubmit, tiposCx, setTiposCx, 
 }
 
 // ---------- Day Detail Modal ----------
-function DayModal({ dateStr, records, notes, jornada, onClose, onDelete, onRestore, onEdit, onMove, onAddNote, onUpdateNote, onSetJornada, onAdd }) {
+function DayModal({ dateStr, records, notes, jornada, onClose, onDelete, onRestore, onEdit, onMove, onAddNote, onUpdateNote, onSetJornada, onAdd, hideEarnings, setHideEarnings }) {
   const finance = useMemo(() => {
     const active = records.filter((r) => !r.deleted);
     const bruto = active.reduce((a, c) => a + (parseFloat(c.valorBruto) || 0), 0);
@@ -493,9 +499,22 @@ function DayModal({ dateStr, records, notes, jornada, onClose, onDelete, onResto
         </div>
 
         <div className="modal-finance">
-          <div><span>Bruto</span><b>{fmtMoney(finance.bruto)}</b></div>
-          <div className="neg"><span>Retencion {(TAX_RATE * 100).toFixed(2)}%</span><b>-{fmtMoney(finance.retencion)}</b></div>
-          <div className="pos"><span>Liquido del dia</span><b>{fmtMoney(finance.liquido)}</b></div>
+          <div><span>Bruto</span><b>{fmtMaybe(finance.bruto, hideEarnings)}</b></div>
+          <div className="neg"><span>Retencion {(TAX_RATE * 100).toFixed(2)}%</span><b>{hideEarnings ? MASK : `-${fmtMoney(finance.retencion)}`}</b></div>
+          <div className="pos">
+            <span>
+              Liquido del dia
+              <button
+                type="button"
+                className="icon-btn earnings-eye"
+                onClick={() => setHideEarnings((v) => !v)}
+                title={hideEarnings ? 'Mostrar monto' : 'Ocultar monto'}
+                aria-label={hideEarnings ? 'Mostrar monto' : 'Ocultar monto'}>
+                {hideEarnings ? <EyeOff size={14} /> : <Eye size={14} />}
+              </button>
+            </span>
+            <b>{fmtMaybe(finance.liquido, hideEarnings)}</b>
+          </div>
         </div>
 
         <div className="jornada-row">
@@ -523,7 +542,7 @@ function DayModal({ dateStr, records, notes, jornada, onClose, onDelete, onResto
                     <b>{r.paciente}</b>
                     <small>{r.tipoCx} · {r.medico} · {r.institucion}</small>
                   </div>
-                  <div className="rec-money">{fmtMoney(r.valorBruto)}</div>
+                  <div className="rec-money">{fmtMaybe(r.valorBruto, hideEarnings)}</div>
                   <div className="rec-actions">
                     {!r.deleted && <button className="icon-btn" title="Mover fecha (paciente suspendido)" onClick={() => onMove(r)}><CalendarClock size={14} /></button>}
                     {!r.deleted && <button className="icon-btn" title="Editar" onClick={() => onEdit(r)}><Edit3 size={14} /></button>}
@@ -776,7 +795,7 @@ function AgendaPanel({ records, notes, jornadas, onSelectDay, onAddDay, expanded
 }
 
 // ---------- Reportes ----------
-function ReportesPanel({ records }) {
+function ReportesPanel({ records, hideEarnings, setHideEarnings }) {
   const [preset, setPreset] = useState('mes');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
@@ -898,11 +917,23 @@ function ReportesPanel({ records }) {
         </div>
       )}
 
+      <div className="earnings-toolbar">
+        <button
+          type="button"
+          className="earnings-toggle"
+          onClick={() => setHideEarnings((v) => !v)}
+          title={hideEarnings ? 'Mostrar montos' : 'Ocultar montos'}
+          aria-label={hideEarnings ? 'Mostrar montos ganados' : 'Ocultar montos ganados'}>
+          {hideEarnings ? <EyeOff size={14} /> : <Eye size={14} />}
+          <span>{hideEarnings ? 'Mostrar montos' : 'Ocultar montos'}</span>
+        </button>
+      </div>
+
       <div className="kpi-row">
         <div className="kpi"><span>Cirugias</span><b>{stats.count}</b></div>
-        <div className="kpi"><span>Bruto</span><b>{fmtMoney(stats.bruto)}</b></div>
-        <div className="kpi neg"><span>Retencion {(TAX_RATE * 100).toFixed(2)}%</span><b>-{fmtMoney(stats.retencion)}</b></div>
-        <div className="kpi pos"><span>Liquido</span><b>{fmtMoney(stats.liquido)}</b></div>
+        <div className="kpi"><span>Bruto</span><b>{fmtMaybe(stats.bruto, hideEarnings)}</b></div>
+        <div className="kpi neg"><span>Retencion {(TAX_RATE * 100).toFixed(2)}%</span><b>{hideEarnings ? MASK : `-${fmtMoney(stats.retencion)}`}</b></div>
+        <div className="kpi pos"><span>Liquido</span><b>{fmtMaybe(stats.liquido, hideEarnings)}</b></div>
       </div>
 
       <div className="rep-actions">
@@ -917,7 +948,7 @@ function ReportesPanel({ records }) {
               <small>{r.fecha} {r.hora}</small>
               <b>{r.paciente}</b>
               <span>{r.tipoCx}</span>
-              <span className="money">{fmtMoney(r.valorBruto)}</span>
+              <span className="money">{fmtMaybe(r.valorBruto, hideEarnings)}</span>
             </div>
           ))
         )}
@@ -928,7 +959,7 @@ function ReportesPanel({ records }) {
 }
 
 // ---------- Historial ----------
-function HistorialPanel({ records, onEdit, onDelete, onRestore, onView, onMove }) {
+function HistorialPanel({ records, onEdit, onDelete, onRestore, onView, onMove, hideEarnings, setHideEarnings }) {
   const [q, setQ] = useState('');
   const [filterCol, setFilterCol] = useState('paciente');
   const [showDeleted, setShowDeleted] = useState(false);
@@ -962,6 +993,15 @@ function HistorialPanel({ records, onEdit, onDelete, onRestore, onView, onMove }
           <input type="checkbox" checked={showDeleted} onChange={(e) => setShowDeleted(e.target.checked)} />
           Papelera
         </label>
+        <button
+          type="button"
+          className="earnings-toggle"
+          onClick={() => setHideEarnings((v) => !v)}
+          title={hideEarnings ? 'Mostrar montos' : 'Ocultar montos'}
+          aria-label={hideEarnings ? 'Mostrar montos ganados' : 'Ocultar montos ganados'}>
+          {hideEarnings ? <EyeOff size={14} /> : <Eye size={14} />}
+          <span>{hideEarnings ? 'Mostrar montos' : 'Ocultar montos'}</span>
+        </button>
       </div>
 
       <div className="hist-table-wrap">
@@ -984,8 +1024,8 @@ function HistorialPanel({ records, onEdit, onDelete, onRestore, onView, onMove }
                   <td>{r.tipoCx}</td>
                   <td>{r.medico}</td>
                   <td>{r.institucion}</td>
-                  <td>{fmtMoney(f.bruto)}</td>
-                  <td className="pos">{fmtMoney(f.liquido)}</td>
+                  <td>{fmtMaybe(f.bruto, hideEarnings)}</td>
+                  <td className="pos">{fmtMaybe(f.liquido, hideEarnings)}</td>
                   <td className="actions">
                     <button className="icon-btn" title="Ver" onClick={() => onView(r)}><Eye size={14} /></button>
                     {!r.deleted && <button className="icon-btn" title="Mover fecha" onClick={() => onMove(r)}><CalendarClock size={14} /></button>}
@@ -1224,6 +1264,10 @@ export default function App() {
   const [theme, setTheme] = useState(prefs0.theme || (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'));
   const [colors, setColors] = useState({ ...DEFAULT_COLORS, ...(prefs0.colors || {}) });
   const [zoom, setZoom] = useState(prefs0.zoom || 1);
+  // Visibilidad de montos ganados (persistida en prefs). Default: oculto.
+  const [hideEarnings, setHideEarnings] = useState(
+    prefs0.hideEarnings === undefined ? true : !!prefs0.hideEarnings
+  );
 
   // data
   const [data, setData] = useState(loadData);
@@ -1281,8 +1325,8 @@ export default function App() {
     // Zoom a nivel body: ajusta layout y scroll bounds en Chromium, Safari y Firefox modernos
     if (zoom === 1) document.body.style.removeProperty('zoom');
     else document.body.style.zoom = String(zoom);
-    savePrefs({ theme, colors, zoom, catalogs: { tiposCx, medicos, instituciones } });
-  }, [theme, colors, zoom, tiposCx, medicos, instituciones]);
+    savePrefs({ theme, colors, zoom, hideEarnings, catalogs: { tiposCx, medicos, instituciones } });
+  }, [theme, colors, zoom, hideEarnings, tiposCx, medicos, instituciones]);
 
   // CDN libs for XLSX + PDF
   useEffect(() => {
@@ -1583,7 +1627,7 @@ export default function App() {
                     expanded={expandedSlot === 'bl'}
                     onToggleExpand={() => setExpandedSlot(expandedSlot === 'bl' ? null : 'bl')}
                     onClose={() => closeBack('bl')} />
-                  <ReportesPanel records={records} />
+                  <ReportesPanel records={records} hideEarnings={hideEarnings} setHideEarnings={setHideEarnings} />
                 </div>
               }
             />
@@ -1616,6 +1660,8 @@ export default function App() {
                     onRestore={restoreRecord}
                     onView={setViewRecord}
                     onMove={setMovingRecord}
+                    hideEarnings={hideEarnings}
+                    setHideEarnings={setHideEarnings}
                   />
                 </div>
               }
@@ -1643,6 +1689,8 @@ export default function App() {
           onUpdateNote={removeNote}
           onSetJornada={setJornada}
           onAdd={openNewRegistro}
+          hideEarnings={hideEarnings}
+          setHideEarnings={setHideEarnings}
         />
       )}
 
