@@ -848,18 +848,35 @@ function ReportesPanel({ records, hideEarnings, setHideEarnings }) {
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
 
+  // Selecciones especificas por modo (default: hoy / mes actual / año actual)
+  const now0 = new Date();
+  const todayStr0 = dateToStr(now0);
+  const ymStr0 = `${now0.getFullYear()}-${pad2(now0.getMonth() + 1)}`;
+  const [periodDay, setPeriodDay] = useState(todayStr0);
+  const [periodWeek, setPeriodWeek] = useState(todayStr0);
+  const [periodMonth, setPeriodMonth] = useState(ymStr0);
+  const [periodYear, setPeriodYear] = useState(String(now0.getFullYear()));
+
   const range = useMemo(() => {
     const now = new Date();
     let start, end;
-    if (preset === 'dia') {
-      start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
+    if (preset === 'todos') {
+      start = new Date(2000, 0, 1);
+      end = new Date(2100, 11, 31, 23, 59, 59);
+    } else if (preset === 'dia') {
+      const d = periodDay ? parseDate(periodDay) : now;
+      start = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+      end = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59);
     } else if (preset === 'semana') {
-      start = new Date(now); start.setDate(now.getDate() - now.getDay());
-      end = new Date(start); end.setDate(start.getDate() + 6);
+      const d = periodWeek ? parseDate(periodWeek) : now;
+      const day = d.getDay();
+      const offset = day === 0 ? -6 : 1 - day;
+      start = new Date(d.getFullYear(), d.getMonth(), d.getDate() + offset);
+      end = new Date(start); end.setDate(start.getDate() + 6); end.setHours(23, 59, 59);
     } else if (preset === 'mes') {
-      start = new Date(now.getFullYear(), now.getMonth(), 1);
-      end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+      const [y, m] = (periodMonth || ymStr0).split('-').map(Number);
+      start = new Date(y, m - 1, 1);
+      end = new Date(y, m, 0, 23, 59, 59);
     } else if (preset === 'bimestre') {
       start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
       end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
@@ -867,14 +884,15 @@ function ReportesPanel({ records, hideEarnings, setHideEarnings }) {
       start = new Date(now.getFullYear(), now.getMonth() - 2, 1);
       end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
     } else if (preset === 'anio') {
-      start = new Date(now.getFullYear(), 0, 1);
-      end = new Date(now.getFullYear(), 11, 31);
+      const y = parseInt(periodYear, 10) || now.getFullYear();
+      start = new Date(y, 0, 1);
+      end = new Date(y, 11, 31, 23, 59, 59);
     } else {
       start = from ? parseDate(from) : new Date(2000, 0, 1);
       end = to ? parseDate(to) : new Date(2100, 0, 1);
     }
     return { start, end };
-  }, [preset, from, to]);
+  }, [preset, from, to, periodDay, periodWeek, periodMonth, periodYear, ymStr0]);
 
   const filtered = useMemo(() => records.filter((r) => {
     if (r.deleted) return false;
@@ -988,10 +1006,44 @@ function ReportesPanel({ records, hideEarnings, setHideEarnings }) {
   return (
     <div className="reportes">
       <div className="rep-presets">
-        {[['dia', 'Día'], ['semana', 'Semana'], ['mes', 'Mes'], ['bimestre', '2 meses'], ['trimestre', '3 meses'], ['anio', 'Año'], ['custom', 'Personalizado']].map(([k, l]) => (
+        {[['todos', 'Todos'], ['dia', 'Día'], ['semana', 'Semana'], ['mes', 'Mes'], ['bimestre', '2 meses'], ['trimestre', '3 meses'], ['anio', 'Año'], ['custom', 'Personalizado']].map(([k, l]) => (
           <button key={k} className={preset === k ? 'on' : ''} onClick={() => setPreset(k)}>{l}</button>
         ))}
       </div>
+      {(preset === 'dia' || preset === 'semana' || preset === 'mes' || preset === 'anio') && (
+        <div className="hist-period-picker">
+          {preset === 'dia' && (
+            <>
+              <label>Elegi el dia:</label>
+              <input className="input" type="date" value={periodDay} onChange={(e) => setPeriodDay(e.target.value)} />
+            </>
+          )}
+          {preset === 'semana' && (
+            <>
+              <label>Elegi cualquier dia de la semana:</label>
+              <input className="input" type="date" value={periodWeek} onChange={(e) => setPeriodWeek(e.target.value)} />
+              <small className="muted">
+                Lun {range.start.toLocaleDateString('es-CL', { day: '2-digit', month: 'short' })} —
+                Dom {range.end.toLocaleDateString('es-CL', { day: '2-digit', month: 'short' })}
+              </small>
+            </>
+          )}
+          {preset === 'mes' && (
+            <>
+              <label>Elegi el mes:</label>
+              <input className="input" type="month" value={periodMonth} onChange={(e) => setPeriodMonth(e.target.value)} />
+            </>
+          )}
+          {preset === 'anio' && (
+            <>
+              <label>Elegi el año:</label>
+              <input className="input" type="number" min="2000" max="2100" step="1"
+                value={periodYear} onChange={(e) => setPeriodYear(e.target.value)}
+                style={{ maxWidth: 110 }} />
+            </>
+          )}
+        </div>
+      )}
       {preset === 'custom' && (
         <div className="rep-range">
           <input className="input" type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
