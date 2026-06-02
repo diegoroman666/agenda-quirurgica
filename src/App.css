@@ -1217,6 +1217,12 @@ label { display: block; font-size: 0.74rem; font-weight: 700; text-transform: up
   max-height: 68vh !important;
 }
 
+/* Reportes expandido: la lista de cirugias toma la misma altura que el
+   Historial expandido para mostrar ~12 filas en vez de 4. */
+.grid-4.expanded-bl .slot-bl .rep-list {
+  max-height: 68vh !important;
+}
+
 /* ============================================================================
    FIX 1b: BODY LOCK + MODAL OVERSCROLL
    Cuando hay modal abierto se bloquea el scroll del body para que el deslizar
