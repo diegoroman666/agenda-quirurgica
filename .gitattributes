@@ -1,0 +1,4 @@
+# Las migraciones de Netlify DB se hashean para detectar manipulacion despues
+# de aplicarlas. CRLF en Windows rompe el hash. Forzar LF siempre.
+netlify/database/migrations/**/*.sql      text eol=lf
+netlify/database/migrations/**/*.json     text eol=lf
