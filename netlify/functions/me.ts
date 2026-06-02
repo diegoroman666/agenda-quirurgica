@@ -1,12 +1,16 @@
 import type { Config, Context } from "@netlify/functions";
 import { getSession } from "./_auth.js";
-import { db } from "../../db/index.js";
+import { db, dbAvailable } from "../../db/index.js";
 import { users } from "../../db/schema.js";
 import { eq } from "drizzle-orm";
 
 export default async (req: Request, context: Context) => {
   if (req.method !== "GET") {
     return new Response("Method not allowed", { status: 405 });
+  }
+
+  if (!dbAvailable) {
+    return Response.json({ error: "cloud sync not configured" }, { status: 503 });
   }
 
   const session = getSession(req);

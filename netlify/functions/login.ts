@@ -1,5 +1,5 @@
 import type { Config, Context } from "@netlify/functions";
-import { db } from "../../db/index.js";
+import { db, dbAvailable } from "../../db/index.js";
 import { users } from "../../db/schema.js";
 import { eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
@@ -9,6 +9,13 @@ import { sessionCookie } from "./_auth.js";
 export default async (req: Request, context: Context) => {
   if (req.method !== "POST") {
     return new Response("Method not allowed", { status: 405 });
+  }
+
+  if (!dbAvailable) {
+    return Response.json(
+      { error: "Cloud sync no esta configurado en este sitio. Por ahora la app funciona solo con datos locales en este dispositivo." },
+      { status: 503 }
+    );
   }
 
   const secret = process.env.JWT_SECRET;

@@ -21,7 +21,7 @@ const handle = async (res) => {
 
 export const apiMe = async () => {
   const res = await fetch('/api/me', { credentials: 'same-origin' });
-  if (res.status === 401 || res.status === 404) return null;
+  if (res.status === 401 || res.status === 404 || res.status === 503) return null;
   if (!res.ok) return null;
   const ct = res.headers.get('content-type') || '';
   // Defensa contra dev servers (Vite) que sirven index.html en rutas /api/*
