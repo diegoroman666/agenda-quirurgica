@@ -1006,7 +1006,7 @@ function ReportesPanel({ records, hideEarnings, setHideEarnings }) {
   return (
     <div className="reportes">
       <div className="rep-presets">
-        {[['todos', 'Todos'], ['dia', 'Día'], ['semana', 'Semana'], ['mes', 'Mes'], ['bimestre', '2 meses'], ['trimestre', '3 meses'], ['anio', 'Año'], ['custom', 'Personalizado']].map(([k, l]) => (
+        {[['todos', 'Todos'], ['dia', 'Día'], ['semana', 'Semana'], ['mes', 'Mes'], ['anio', 'Año'], ['custom', 'Personalizado']].map(([k, l]) => (
           <button key={k} className={preset === k ? 'on' : ''} onClick={() => setPreset(k)}>{l}</button>
         ))}
       </div>
