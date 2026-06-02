@@ -429,6 +429,17 @@ function RegistroForm({ data, setData, onCancel, onSubmit, tiposCx, setTiposCx, 
           </select>
         </div>
         <div className="col2">
+          <label>MK</label>
+          <input
+            className="input"
+            type="text"
+            placeholder="Codigo MK (alfanumerico)"
+            value={data.mk || ''}
+            onChange={(e) => update('mk', e.target.value.replace(/[^a-zA-Z0-9]/g, '').toUpperCase())}
+            maxLength={20}
+          />
+        </div>
+        <div className="col2">
           <label>Tipo de cirugia</label>
           <div className="input-add">
             <select className="input" required value={data.tipoCx} onChange={(e) => update('tipoCx', e.target.value)}>
@@ -569,6 +580,9 @@ function DayModal({ dateStr, records, notes, jornada, onClose, onDelete, onResto
                   <div className="rec-main">
                     <b>{r.paciente}</b>
                     <small>{r.tipoCx} · {r.medico} · <InstBadge name={r.institucion} /></small>
+                    {r.obs && (
+                      <small className="rec-obs"><StickyNote size={12} /> {r.obs}</small>
+                    )}
                   </div>
                   <div className="rec-money">{fmtMaybe(r.valorBruto, hideEarnings)}</div>
                   <div className="rec-actions">
@@ -691,9 +705,11 @@ function AgendaPanel({ records, notes, jornadas, onSelectDay, onAddDay, expanded
   const monthDays = useMemo(() => {
     const y = cursor.getFullYear(), m = cursor.getMonth();
     const first = new Date(y, m, 1).getDay();
+    // Grid Lun-Dom: convertir Dom=0..Sab=6 a offset Mon-first (Lun=0..Dom=6)
+    const offset = (first + 6) % 7;
     const last = new Date(y, m + 1, 0).getDate();
     const days = [];
-    for (let i = 0; i < first; i++) days.push(null);
+    for (let i = 0; i < offset; i++) days.push(null);
     for (let i = 1; i <= last; i++) days.push(dateToStr(new Date(y, m, i)));
     return days;
   }, [cursor]);
@@ -864,6 +880,11 @@ function ReportesPanel({ records, hideEarnings, setHideEarnings }) {
     if (r.deleted) return false;
     const d = parseDate(r.fecha);
     return d >= range.start && d <= range.end;
+  }).sort((a, b) => {
+    // Orden cronologico ascendente (fecha + hora) para Excel/PDF/lista
+    const fa = `${a.fecha || ''} ${a.hora || '00:00'}`;
+    const fb = `${b.fecha || ''} ${b.hora || '00:00'}`;
+    return fa.localeCompare(fb);
   }), [records, range]);
 
   const stats = useMemo(() => {
@@ -877,7 +898,7 @@ function ReportesPanel({ records, hideEarnings, setHideEarnings }) {
     const rows = filtered.map((r) => {
       const f = calcFinance(r.valorBruto);
       return {
-        Fecha: r.fecha, Hora: r.hora, Paciente: r.paciente,
+        Fecha: r.fecha, Hora: r.hora, MK: r.mk || '', Paciente: r.paciente,
         Cirugia: r.tipoCx, Cirujano: r.medico, Institucion: r.institucion,
         Edad: r.edad || '', Sexo: r.sexo || '',
         'Bruto ($)': f.bruto, [`Retencion ${(TAX_RATE * 100).toFixed(2)}% ($)`]: Math.round(f.retencion),
@@ -885,7 +906,7 @@ function ReportesPanel({ records, hideEarnings, setHideEarnings }) {
       };
     });
     const ws = window.XLSX.utils.json_to_sheet(rows);
-    ws['!cols'] = [{ wch: 11 }, { wch: 7 }, { wch: 28 }, { wch: 22 }, { wch: 22 }, { wch: 22 }, { wch: 6 }, { wch: 10 }, { wch: 12 }, { wch: 14 }, { wch: 12 }, { wch: 30 }];
+    ws['!cols'] = [{ wch: 11 }, { wch: 7 }, { wch: 12 }, { wch: 28 }, { wch: 22 }, { wch: 22 }, { wch: 22 }, { wch: 6 }, { wch: 10 }, { wch: 12 }, { wch: 14 }, { wch: 12 }, { wch: 30 }];
     const wb = window.XLSX.utils.book_new();
     window.XLSX.utils.book_append_sheet(wb, ws, 'Cirugias');
     window.XLSX.writeFile(wb, `agenda-quirurgica-${preset}.xlsx`);
@@ -912,23 +933,50 @@ function ReportesPanel({ records, hideEarnings, setHideEarnings }) {
     doc.setFontSize(13); doc.setTextColor(40, 167, 69);
     doc.text(`Liquido: ${fmtMoney(stats.liquido)}`, 18, 76);
 
+    // Layout: Fecha | MK | Paciente | Cirugia | Cirujano | Bruto | Liquido
+    // Page width 210mm, margins 14/196 → 182mm utiles, distribuidos para que no se solapen.
+    const COLS = [
+      { k: 'fecha',    label: 'Fecha',    x: 14,  w: 22 },
+      { k: 'mk',       label: 'MK',       x: 36,  w: 16 },
+      { k: 'paciente', label: 'Paciente', x: 52,  w: 38 },
+      { k: 'tipoCx',   label: 'Cirugia',  x: 90,  w: 30 },
+      { k: 'medico',   label: 'Cirujano', x: 120, w: 26 },
+      { k: 'bruto',    label: 'Bruto',    x: 146, w: 24, align: 'right' },
+      { k: 'liquido',  label: 'Liquido',  x: 170, w: 26, align: 'right' },
+    ];
+    // Aprox chars que entran por mm a 8pt (~1.7mm por char). Trunca segura para no invadir vecinos.
+    const truncForCol = (s, mm) => {
+      const max = Math.max(3, Math.floor(mm / 1.6));
+      const t = String(s || '');
+      return t.length > max ? t.slice(0, max - 1) + '…' : t;
+    };
+
     doc.setFontSize(12); doc.setTextColor(0); doc.text('Detalle', 14, 90);
     doc.setFillColor(240, 240, 240); doc.rect(14, 93, 182, 6, 'F');
     doc.setFontSize(8); doc.setTextColor(60);
-    doc.text('Fecha', 16, 97); doc.text('Paciente', 40, 97);
-    doc.text('Cirugia', 86, 97); doc.text('Cirujano', 128, 97);
-    doc.text('Bruto', 165, 97); doc.text('Liquido', 182, 97);
+    COLS.forEach((c) => {
+      if (c.align === 'right') doc.text(c.label, c.x + c.w - 1, 97, { align: 'right' });
+      else doc.text(c.label, c.x + 1, 97);
+    });
 
     let y = 104; doc.setTextColor(0);
     filtered.forEach((r) => {
       if (y > 275) { doc.addPage(); y = 20; }
       const f = calcFinance(r.valorBruto);
-      doc.text(String(r.fecha || ''), 16, y);
-      doc.text(String(r.paciente || '').slice(0, 26), 40, y);
-      doc.text(String(r.tipoCx || '').slice(0, 22), 86, y);
-      doc.text(String(r.medico || '').slice(0, 18), 128, y);
-      doc.text(fmtMoney(f.bruto), 165, y);
-      doc.text(fmtMoney(f.liquido), 182, y);
+      const cellValue = {
+        fecha: r.fecha || '',
+        mk: r.mk || '',
+        paciente: r.paciente || '',
+        tipoCx: r.tipoCx || '',
+        medico: r.medico || '',
+        bruto: fmtMoney(f.bruto),
+        liquido: fmtMoney(f.liquido),
+      };
+      COLS.forEach((c) => {
+        const v = truncForCol(cellValue[c.k], c.w);
+        if (c.align === 'right') doc.text(v, c.x + c.w - 1, y, { align: 'right' });
+        else doc.text(v, c.x + 1, y);
+      });
       y += 5;
     });
 
@@ -1008,20 +1056,124 @@ function HistorialPanel({ records, onEdit, onDelete, onRestore, onView, onMove, 
   const [q, setQ] = useState('');
   const [filterCol, setFilterCol] = useState('paciente');
   const [showDeleted, setShowDeleted] = useState(false);
+  const [periodFilter, setPeriodFilter] = useState('todos'); // todos | dia | semana | mes | anio | custom
+
+  // Valores seleccionados por el usuario para cada modo (default = hoy / mes actual / año actual)
+  const now0 = new Date();
+  const todayStr0 = dateToStr(now0);
+  const ymStr0 = `${now0.getFullYear()}-${pad2(now0.getMonth() + 1)}`;
+  const [periodDay, setPeriodDay] = useState(todayStr0);
+  const [periodWeek, setPeriodWeek] = useState(todayStr0); // cualquier fecha dentro de la semana
+  const [periodMonth, setPeriodMonth] = useState(ymStr0);  // YYYY-MM
+  const [periodYear, setPeriodYear] = useState(String(now0.getFullYear()));
+  const [customFrom, setCustomFrom] = useState('');
+  const [customTo, setCustomTo] = useState('');
+
+  const periodRange = useMemo(() => {
+    if (periodFilter === 'dia' && periodDay) {
+      const d = parseDate(periodDay);
+      const start = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+      const end = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59);
+      return { start, end };
+    }
+    if (periodFilter === 'semana' && periodWeek) {
+      const d = parseDate(periodWeek);
+      const day = d.getDay();
+      const offset = day === 0 ? -6 : 1 - day;
+      const start = new Date(d.getFullYear(), d.getMonth(), d.getDate() + offset);
+      const end = new Date(start); end.setDate(start.getDate() + 6); end.setHours(23, 59, 59);
+      return { start, end };
+    }
+    if (periodFilter === 'mes' && periodMonth) {
+      const [y, m] = periodMonth.split('-').map(Number);
+      const start = new Date(y, m - 1, 1);
+      const end = new Date(y, m, 0, 23, 59, 59);
+      return { start, end };
+    }
+    if (periodFilter === 'anio' && periodYear) {
+      const y = parseInt(periodYear, 10);
+      if (!isNaN(y)) return { start: new Date(y, 0, 1), end: new Date(y, 11, 31, 23, 59, 59) };
+    }
+    if (periodFilter === 'custom') {
+      const start = customFrom ? parseDate(customFrom) : new Date(2000, 0, 1);
+      const end = customTo ? new Date(parseDate(customTo).setHours(23, 59, 59)) : new Date(2100, 11, 31);
+      return { start, end };
+    }
+    return null;
+  }, [periodFilter, periodDay, periodWeek, periodMonth, periodYear, customFrom, customTo]);
 
   const filtered = useMemo(() => {
     const term = q.toLowerCase().trim();
     return records.filter((r) => {
       if (!showDeleted && r.deleted) return false;
       if (showDeleted && !r.deleted) return false;
+      if (periodRange) {
+        const d = parseDate(r.fecha);
+        if (d < periodRange.start || d > periodRange.end) return false;
+      }
       if (!term) return true;
       const val = String(r[filterCol] ?? '').toLowerCase();
       return val.includes(term);
+    }).sort((a, b) => {
+      const fa = `${a.fecha || ''} ${a.hora || '00:00'}`;
+      const fb = `${b.fecha || ''} ${b.hora || '00:00'}`;
+      return fa.localeCompare(fb);
     });
-  }, [records, q, filterCol, showDeleted]);
+  }, [records, q, filterCol, showDeleted, periodRange]);
 
   return (
     <div className="historial">
+      <div className="hist-period">
+        {[['todos', 'Todos'], ['dia', 'Dia'], ['semana', 'Semana'], ['mes', 'Mes'], ['anio', 'Año'], ['custom', 'Personalizado']].map(([k, l]) => (
+          <button key={k} type="button"
+            className={`hist-period-btn ${periodFilter === k ? 'on' : ''}`}
+            onClick={() => setPeriodFilter(k)}>{l}</button>
+        ))}
+      </div>
+      {periodFilter !== 'todos' && (
+        <div className="hist-period-picker">
+          {periodFilter === 'dia' && (
+            <>
+              <label>Elegi el dia:</label>
+              <input className="input" type="date" value={periodDay} onChange={(e) => setPeriodDay(e.target.value)} />
+            </>
+          )}
+          {periodFilter === 'semana' && (
+            <>
+              <label>Elegi cualquier dia de la semana:</label>
+              <input className="input" type="date" value={periodWeek} onChange={(e) => setPeriodWeek(e.target.value)} />
+              {periodRange && (
+                <small className="muted">
+                  Lun {periodRange.start.toLocaleDateString('es-CL', { day: '2-digit', month: 'short' })} —
+                  Dom {periodRange.end.toLocaleDateString('es-CL', { day: '2-digit', month: 'short' })}
+                </small>
+              )}
+            </>
+          )}
+          {periodFilter === 'mes' && (
+            <>
+              <label>Elegi el mes:</label>
+              <input className="input" type="month" value={periodMonth} onChange={(e) => setPeriodMonth(e.target.value)} />
+            </>
+          )}
+          {periodFilter === 'anio' && (
+            <>
+              <label>Elegi el año:</label>
+              <input className="input" type="number" min="2000" max="2100" step="1"
+                value={periodYear} onChange={(e) => setPeriodYear(e.target.value)}
+                style={{ maxWidth: 110 }} />
+            </>
+          )}
+          {periodFilter === 'custom' && (
+            <>
+              <label>Desde:</label>
+              <input className="input" type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} />
+              <label>Hasta:</label>
+              <input className="input" type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)} />
+            </>
+          )}
+        </div>
+      )}
       <div className="hist-toolbar">
         <div className="hist-search">
           <Search size={14} />
@@ -1029,6 +1181,7 @@ function HistorialPanel({ records, onEdit, onDelete, onRestore, onView, onMove, 
         </div>
         <select className="input" value={filterCol} onChange={(e) => setFilterCol(e.target.value)}>
           <option value="paciente">Paciente</option>
+          <option value="mk">MK</option>
           <option value="tipoCx">Tipo de cirugia</option>
           <option value="medico">Cirujano</option>
           <option value="institucion">Institucion</option>
@@ -1057,12 +1210,12 @@ function HistorialPanel({ records, onEdit, onDelete, onRestore, onView, onMove, 
         <table className="hist-table">
           <thead>
             <tr>
-              <th>Fecha</th><th>Hora</th><th>Paciente</th><th>Cirugia</th><th>Cirujano</th><th>Institucion</th><th>Bruto</th><th>Liquido</th><th></th>
+              <th>Fecha</th><th>Hora</th><th>MK</th><th>Paciente</th><th>Cirugia</th><th>Cirujano</th><th>Institucion</th><th>Bruto</th><th>Liquido</th><th></th>
             </tr>
           </thead>
           <tbody id="hist-table-top">
             {filtered.length === 0 ? (
-              <tr><td colSpan="9" className="muted center">Sin registros.</td></tr>
+              <tr><td colSpan="10" className="muted center">Sin registros.</td></tr>
             ) : (
               <>
                 {filtered.map((r) => {
@@ -1071,6 +1224,7 @@ function HistorialPanel({ records, onEdit, onDelete, onRestore, onView, onMove, 
                     <tr key={r.id} className={r.deleted ? 'deleted' : ''}>
                       <td>{r.fecha}</td>
                       <td>{r.hora}</td>
+                      <td>{r.mk ? <code>{r.mk}</code> : <span className="muted">—</span>}</td>
                       <td><b>{r.paciente}</b></td>
                       <td>{r.tipoCx}</td>
                       <td>{r.medico}</td>
@@ -1090,7 +1244,7 @@ function HistorialPanel({ records, onEdit, onDelete, onRestore, onView, onMove, 
                     </tr>
                   );
                 })}
-                <tr><td colSpan="9" className="scroll-top-cell"><button className="btn-ghost sm scroll-top-btn" onClick={() => scrollToTop(document.querySelector('.slot-br .hist-table-wrap'))}><ChevronUp size={14} /> Volver al inicio</button></td></tr>
+                <tr><td colSpan="10" className="scroll-top-cell"><button className="btn-ghost sm scroll-top-btn" onClick={() => scrollToTop(document.querySelector('.slot-br .hist-table-wrap'))}><ChevronUp size={14} /> Volver al inicio</button></td></tr>
               </>
             )}
           </tbody>
@@ -1124,6 +1278,7 @@ function HistorialPanel({ records, onEdit, onDelete, onRestore, onView, onMove, 
                     </div>
                   </div>
                   <div className="hist-card-body">
+                    {r.mk && <span><b>MK:</b> <code>{r.mk}</code></span>}
                     <span><b>Cirugía:</b> {r.tipoCx}</span>
                     <span><b>Cirujano:</b> {r.medico}</span>
                     <span><b>Institución:</b> <InstBadge name={r.institucion} /></span>
@@ -1200,6 +1355,7 @@ const APP_FIELDS = [
   { k: 'valorBruto', l: 'Honorarios', match: ['valor', 'monto', 'honorario', 'precio', 'bruto'] },
   { k: 'edad', l: 'Edad', match: ['edad', 'age'] },
   { k: 'sexo', l: 'Sexo', match: ['sexo', 'genero', 'sex'] },
+  { k: 'mk', l: 'MK', match: ['mk', 'marker', 'codigo'] },
 ];
 
 function ImportarExcelModal({ onClose, onImport }) {
@@ -1409,7 +1565,7 @@ export default function App() {
   const emptyForm = () => ({
     fecha: dateToStr(new Date()),
     hora: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }),
-    paciente: '', edad: '', sexo: '', tipoCx: '', medico: '', institucion: '',
+    paciente: '', edad: '', sexo: '', mk: '', tipoCx: '', medico: '', institucion: '',
     valorBruto: '', obs: '', colorEtiqueta: LABEL_COLORS[0].v,
   });
   const [formData, setFormData] = useState(emptyForm());
@@ -1846,6 +2002,7 @@ export default function App() {
           <dl className="detail-dl">
             <dt>Fecha</dt><dd>{viewRecord.fecha} {viewRecord.hora}</dd>
             <dt>Paciente</dt><dd>{viewRecord.paciente} {viewRecord.edad && `(${viewRecord.edad} a, ${viewRecord.sexo})`}</dd>
+            {viewRecord.mk && (<><dt>MK</dt><dd><code>{viewRecord.mk}</code></dd></>)}
             <dt>Cirugia</dt><dd>{viewRecord.tipoCx}</dd>
             <dt>Cirujano</dt><dd>{viewRecord.medico}</dd>
             <dt>Institucion</dt><dd><InstBadge name={viewRecord.institucion} /></dd>
